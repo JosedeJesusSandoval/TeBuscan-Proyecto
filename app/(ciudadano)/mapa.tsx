@@ -3,16 +3,19 @@ import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
+import { obtenerReportesParaMapa } from '../../DB/supabase';
 
 export default function MapaScreen() {
   const [location, setLocation] = useState<Location.LocationObject | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [reportes, setReportes] = useState<any[]>([]);
+  const [filtroEstatus, setFiltroEstatus] = useState<string>('desaparecido');
+  const [mostrarFiltros, setMostrarFiltros] = useState(false);
 
   useEffect(() => {
     getCurrentLocation();
-    fetchReportes();
+    fetchReportes(filtroEstatus);
   }, []);
 
   const getCurrentLocation = async () => {
@@ -57,21 +60,42 @@ export default function MapaScreen() {
     }
   };
 
-  const fetchReportes = async () => {
+  const fetchReportes = async (estatus?: string) => {
     try {
-      const response = await fetch('https://api.example.com/reportes');
-      const data = await response.json();
-      setReportes(data);
+      const filtros: any = { dias_recientes: 365 };
+      
+      if (estatus && estatus !== 'todos') {
+        filtros.estatus = estatus;
+      }
+
+      const resultado = await obtenerReportesParaMapa(filtros);
+
+      if (resultado.success) {
+        setReportes(resultado.data || []);
+      } else {
+        console.error('Error obteniendo reportes:', resultado.error);
+        setReportes([]);
+      }
     } catch (error) {
       console.error('Error obteniendo reportes:', error);
       setReportes([]);
     }
   };
 
+  const cambiarFiltro = (nuevoEstatus: string) => {
+    setFiltroEstatus(nuevoEstatus);
+    fetchReportes(nuevoEstatus);
+    setMostrarFiltros(false);
+  };
+
   const handleMarkerPress = (reporte: any) => {
+    const fechaFormateada = reporte.ultima_fecha_visto 
+      ? new Date(reporte.ultima_fecha_visto).toLocaleDateString('es-MX')
+      : 'No disponible';
+
     Alert.alert(
-      reporte.nombre,
-      `Estado: ${reporte.estado}\nFecha: ${reporte.fecha}`,
+      reporte.nombre_desaparecido,
+      `Estado: ${reporte.estatus.toUpperCase()}\nEdad: ${reporte.edad || 'No especificada'} años\nÚltima vez visto: ${fechaFormateada}\nUbicación: ${reporte.ultima_ubicacion}`,
       [
         { text: 'Cancelar', style: 'cancel' },
         { 
@@ -102,8 +126,53 @@ export default function MapaScreen() {
     longitudeDelta: 0.0421,
   };
 
+
+
   return (
     <View style={styles.container}>
+      {/* Panel de filtros */}
+      <View style={styles.filterPanel}>
+        <TouchableOpacity 
+          style={styles.filterButton}
+          onPress={() => setMostrarFiltros(!mostrarFiltros)}
+        >
+          <Text style={styles.filterButtonText}>
+            Filtros: {filtroEstatus === 'todos' ? 'Todos' : filtroEstatus.toUpperCase()} ({reportes.length})
+          </Text>
+        </TouchableOpacity>
+        
+        {mostrarFiltros && (
+          <View style={styles.filterOptions}>
+            <TouchableOpacity 
+              style={[styles.filterOption, filtroEstatus === 'desaparecido' && styles.filterOptionActive]}
+              onPress={() => cambiarFiltro('desaparecido')}
+            >
+              <Text style={[styles.filterOptionText, filtroEstatus === 'desaparecido' && styles.filterOptionTextActive]}>
+                🔴 Desaparecidos
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.filterOption, filtroEstatus === 'encontrado' && styles.filterOptionActive]}
+              onPress={() => cambiarFiltro('encontrado')}
+            >
+              <Text style={[styles.filterOptionText, filtroEstatus === 'encontrado' && styles.filterOptionTextActive]}>
+                🟢 Encontrados
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.filterOption, filtroEstatus === 'todos' && styles.filterOptionActive]}
+              onPress={() => cambiarFiltro('todos')}
+            >
+              <Text style={[styles.filterOptionText, filtroEstatus === 'todos' && styles.filterOptionTextActive]}>
+                📋 Todos
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+
       <MapView
         style={styles.map}
         initialRegion={initialRegion}
@@ -118,12 +187,15 @@ export default function MapaScreen() {
           <Marker
             key={reporte.id}
             coordinate={{
-              latitude: reporte.ultimaUbicacion.latitud,
-              longitude: reporte.ultimaUbicacion.longitud,
+              latitude: reporte.latitud,
+              longitude: reporte.longitud,
             }}
-            title={reporte.nombre}
-            description={`${reporte.estado} - ${reporte.fecha}`}
-            pinColor={reporte.estado === 'activo' ? 'red' : 'green'}
+            title={reporte.nombre_desaparecido}
+            description={`${reporte.estatus} - ${reporte.ultima_ubicacion}`}
+            pinColor={
+              reporte.estatus === 'desaparecido' ? '#e74c3c' : 
+              reporte.estatus === 'encontrado' ? '#27ae60' : '#f39c12'
+            }
             onPress={() => handleMarkerPress(reporte)}
           />
         ))}
@@ -196,5 +268,54 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 12,
     textAlign: 'center',
+  },
+  filterPanel: {
+    position: 'absolute',
+    top: 60,
+    left: 20,
+    right: 20,
+    zIndex: 1000,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 10,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  filterButton: {
+    padding: 12,
+    borderRadius: 10,
+  },
+  filterButtonText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    textAlign: 'center',
+  },
+  filterOptions: {
+    paddingHorizontal: 10,
+    paddingBottom: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  filterOption: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    backgroundColor: '#ecf0f1',
+    marginHorizontal: 2,
+  },
+  filterOptionActive: {
+    backgroundColor: '#3498db',
+  },
+  filterOptionText: {
+    fontSize: 12,
+    color: '#2c3e50',
+    textAlign: 'center',
+  },
+  filterOptionTextActive: {
+    color: 'white',
+    fontWeight: 'bold',
   },
 });

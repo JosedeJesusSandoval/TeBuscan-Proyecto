@@ -1,8 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { Alert, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { actualizarUsuario, insertarUsuario, obtenerUsuarios } from '../../DB/supabase';
+import {
+  actualizarUsuario,
+  insertarUsuario,
+  obtenerUsuarios
+} from '../../DB/supabase';
 import { hashPassword } from '../../utils/crypto';
 import { validatePassword } from '../../utils/passwordValidation';
+
+// Importaciones específicas para activación/desactivación
+const { desactivarUsuario, activarUsuario } = require('../../DB/supabase');
 
 interface Usuario {
   id: number;
@@ -108,7 +115,7 @@ export default function UsuariosScreen() {
     }
 
     try {
-      const hashedPassword = hashPassword(password);
+      const hashedPassword = await hashPassword(password);
       const { success, error } = await insertarUsuario(name, email, hashedPassword, rol, telefono, institucion);
 
       if (success) {
@@ -123,24 +130,63 @@ export default function UsuariosScreen() {
     }
   };
 
-  const handleDeactivateUser = async (userId: number) => {
-    const { success, error } = await actualizarUsuario(userId, { verificado: false });
-    if (success) {
-      Alert.alert('Éxito', 'El usuario ha sido desactivado.');
-      fetchUsers();
-    } else {
-      Alert.alert('Error', `No se pudo desactivar el usuario: ${error}`);
-    }
+  const handleDeactivateUser = async (userId: number, userEmail: string, userName: string) => {
+    Alert.alert(
+      'Confirmar Desactivación',
+      `¿Estás seguro de que deseas desactivar a ${userName}?\n\nEsto impedirá que el usuario inicie sesión hasta que sea reactivado.`,
+      [
+        {
+          text: 'Cancelar',
+          style: 'cancel'
+        },
+        {
+          text: 'Desactivar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const { success, error, message } = await desactivarUsuario(userId, userEmail);
+              if (success) {
+                Alert.alert('Usuario Desactivado', message || 'El usuario ha sido desactivado exitosamente.');
+                fetchUsers();
+              } else {
+                Alert.alert('Error', `No se pudo desactivar el usuario: ${error}`);
+              }
+            } catch (error) {
+              Alert.alert('Error', 'Ocurrió un problema al desactivar el usuario.');
+            }
+          }
+        }
+      ]
+    );
   };
 
-  const handleActivateUser = async (userId: number) => {
-    const { success, error } = await actualizarUsuario(userId, { verificado: true });
-    if (success) {
-      Alert.alert('Éxito', 'El usuario ha sido activado.');
-      fetchUsers();
-    } else {
-      Alert.alert('Error', `No se pudo activar el usuario: ${error}`);
-    }
+  const handleActivateUser = async (userId: number, userEmail: string, userName: string) => {
+    Alert.alert(
+      'Confirmar Activación',
+      `¿Estás seguro de que deseas activar a ${userName}?\n\nEsto permitirá que el usuario inicie sesión normalmente.`,
+      [
+        {
+          text: 'Cancelar',
+          style: 'cancel'
+        },
+        {
+          text: 'Activar',
+          onPress: async () => {
+            try {
+              const { success, error, message } = await activarUsuario(userId, userEmail);
+              if (success) {
+                Alert.alert('Usuario Activado', message || 'El usuario ha sido activado exitosamente.');
+                fetchUsers();
+              } else {
+                Alert.alert('Error', `No se pudo activar el usuario: ${error}`);
+              }
+            } catch (error) {
+              Alert.alert('Error', 'Ocurrió un problema al activar el usuario.');
+            }
+          }
+        }
+      ]
+    );
   };
 
   const handleEditUser = (user: Usuario) => {
@@ -157,7 +203,7 @@ export default function UsuariosScreen() {
 
       
       if (password) {
-        updatedData.password_hash = hashPassword(password);
+        updatedData.password_hash = await hashPassword(password);
       }
 
       
@@ -243,17 +289,32 @@ export default function UsuariosScreen() {
         {users.map((user) => (
           <View key={user.id} style={styles.userCard}>
             <View>
-              <Text style={styles.userName}>{user.name}</Text>
+              <View style={styles.userHeader}>
+                <Text style={styles.userName}>{user.name}</Text>
+                <View style={[
+                  styles.statusBadge, 
+                  user.verificado ? styles.activeBadge : styles.inactiveBadge
+                ]}>
+                  <Text style={styles.statusText}>
+                    {user.verificado ? '🟢 ACTIVO' : '🔴 INACTIVO'}
+                  </Text>
+                </View>
+              </View>
               <Text style={styles.userEmail}>{user.email}</Text>
               <Text style={styles.userRole}>Rol: {user.rol}</Text>
+              {!user.verificado && (
+                <Text style={styles.warningText}>
+                  ⚠️ Este usuario no puede iniciar sesión
+                </Text>
+              )}
             </View>
             <View style={styles.userActions}>
               <TouchableOpacity
                 style={[styles.actionButton, user.verificado ? styles.deactivateButton : styles.activateButton]}
                 onPress={() =>
                   user.verificado
-                    ? handleDeactivateUser(user.id) 
-                    : handleActivateUser(user.id)
+                    ? handleDeactivateUser(user.id, user.email, user.name) 
+                    : handleActivateUser(user.id, user.email, user.name)
                 }
               >
                 <Text style={styles.buttonText}>{user.verificado ? 'Desactivar' : 'Activar'}</Text>
@@ -502,10 +563,17 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
+  userHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
   userName: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#2c3e50',
+    flex: 1,
   },
   userEmail: {
     fontSize: 14,
@@ -515,7 +583,30 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#2980b9',
-    marginBottom: 10,
+    marginBottom: 5,
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginLeft: 10,
+  },
+  activeBadge: {
+    backgroundColor: '#d5f4e6',
+  },
+  inactiveBadge: {
+    backgroundColor: '#ffeaa7',
+  },
+  statusText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+  },
+  warningText: {
+    fontSize: 12,
+    color: '#e74c3c',
+    fontStyle: 'italic',
+    marginTop: 5,
   },
   userActions: {
     flexDirection: 'row',

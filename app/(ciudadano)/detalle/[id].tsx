@@ -1,10 +1,12 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Linking, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { obtenerReportePorId } from '../../../DB/supabase';
+import { obtenerReportePorIdConUsuario } from '../../../DB/supabase';
+import { useAuth } from '../../../context/AuthContext';
 
 export default function DetalleReporte() {
   const { id } = useLocalSearchParams();
+  const { user } = useAuth();
   const [reporte, setReporte] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -22,13 +24,14 @@ export default function DetalleReporte() {
 
       try {
         setLoading(true);
-        const resultado = await obtenerReportePorId(reporteId);
+        // Usar la nueva función que detecta si es el propio reporte del usuario
+        const resultado = await obtenerReportePorIdConUsuario(reporteId, user?.id || null);
         
         if (resultado.success && resultado.data) {
           setReporte(resultado.data);
           setError(null);
         } else {
-          setError(resultado.error || 'Reporte no encontrado');
+          setError((resultado as any).error || 'Reporte no encontrado');
         }
       } catch (error) {
         console.error('Error al cargar reporte:', error);
@@ -237,7 +240,14 @@ export default function DetalleReporte() {
 
         {/* Información del Reportante */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>📞 Información de Contacto</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>📞 Información de Contacto</Text>
+            {reporte.es_propio && (
+              <View style={styles.ownReportBadge}>
+                <Text style={styles.ownReportText}>TU REPORTE</Text>
+              </View>
+            )}
+          </View>
           
           {reporte.nombre_reportante && (
             <Text style={styles.infoText}><Text style={styles.label}>Nombre del Reportante:</Text> {reporte.nombre_reportante}</Text>
@@ -278,8 +288,8 @@ export default function DetalleReporte() {
           </View>
         )}
 
-        {/* Botones de Acción */}
-        {reporte.estatus === 'desaparecido' && (
+        {/* Botones de Acción - Solo para reportes de otros usuarios */}
+        {reporte.estatus === 'desaparecido' && !reporte.es_propio && (
           <View style={styles.buttonContainer}>
             {reporte.telefono_reportante && (
               <TouchableOpacity style={styles.callButton} onPress={handleCall}>
@@ -292,6 +302,16 @@ export default function DetalleReporte() {
                 <Text style={styles.buttonTextSecondary}>✉️ Enviar Correo</Text>
               </TouchableOpacity>
             )}
+          </View>
+        )}
+
+        {/* Mensaje especial para reportes propios */}
+        {reporte.estatus === 'desaparecido' && reporte.es_propio && (
+          <View style={styles.ownReportMessage}>
+            <Text style={styles.ownReportMessageTitle}>📱 Tu Reporte Activo</Text>
+            <Text style={styles.ownReportMessageText}>
+              Este es tu reporte. Si has recibido información sobre esta persona, puedes actualizar el reporte o contactar directamente a las autoridades.
+            </Text>
           </View>
         )}
 
@@ -365,6 +385,42 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#2c3e50',
     marginBottom: 15,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  ownReportBadge: {
+    backgroundColor: '#3498db',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  ownReportText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  ownReportMessage: {
+    backgroundColor: '#e8f4fd',
+    padding: 20,
+    borderRadius: 10,
+    marginTop: 20,
+    borderLeftWidth: 4,
+    borderLeftColor: '#3498db',
+  },
+  ownReportMessageTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    marginBottom: 8,
+  },
+  ownReportMessageText: {
+    fontSize: 14,
+    color: '#34495e',
+    lineHeight: 20,
   },
   infoText: {
     fontSize: 16,

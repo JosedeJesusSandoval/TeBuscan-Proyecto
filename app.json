@@ -1,0 +1,55 @@
+{
+  "expo": {
+    "name": "TeBuscan",
+    "slug": "tebuscan-proyecto",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/Logo.png",
+    "scheme": "tebuscan",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "bundleIdentifier": "com.tebuscan.app",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.tebuscan.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/Logo.png",
+        "backgroundColor": "#ffffff"
+      },
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/Logo.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-web-browser",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Esta aplicación necesita acceso a la ubicación para mostrar reportes cercanos en el mapa."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "La aplicación accede a tus fotos para permitir subir imágenes de personas desaparecidas."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

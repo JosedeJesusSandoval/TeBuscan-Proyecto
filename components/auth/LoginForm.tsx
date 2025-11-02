@@ -1,15 +1,17 @@
 import { router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { insertarUsuario, verificarLogin } from '../../DB/supabase';
-import Button from '../common/Button';
 import { useAuth } from '../../context/AuthContext';
+import { verificarLogin } from '../../DB/supabase';
+import Button from '../common/Button';
+import { ForgotPassword } from './forgotPassword';
 
 
 const LoginForm = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
 
   const { setUser } = useAuth();
   
@@ -74,12 +76,16 @@ const LoginForm = () => {
   };
 
   const handleForgotPassword = () => {
-    Alert.alert(
-      'Recuperar contraseña',
-      'Esta funcionalidad estará disponible próximamente.',
-      [{ text: 'OK' }]
-    );
+    setShowForgotPassword(true);
   };
+
+  const handleBackToLogin = () => {
+    setShowForgotPassword(false);
+  };
+
+  if (showForgotPassword) {
+    return <ForgotPassword onBackToLogin={handleBackToLogin} />;
+  }
 
   if (loading) {
     return (

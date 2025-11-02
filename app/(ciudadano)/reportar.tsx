@@ -2,10 +2,12 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { Picker } from '@react-native-picker/picker';
 import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
+import * as Location from 'expo-location';
 import React, { useState } from 'react';
 import { Alert, Image, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { insertarReporte } from '../../DB/supabase';
 import { useAuth } from '../../context/AuthContext';
+import { encryptSensitiveData } from '../../utils/crypto';
 
 function generarFolio() {
   return 'FOLIO-' + Date.now();
@@ -24,6 +26,7 @@ export default function ReportarScreen() {
   
   // Estados para desaparición
   const [ubicacion, setUbicacion] = useState('');
+  const [coordenadas, setCoordenadas] = useState<{ latitud: number; longitud: number } | null>(null);
   const [fecha, setFecha] = useState<Date | null>(null);
   const [hora, setHora] = useState<Date | null>(null);
   const [circunstancias, setCircunstancias] = useState('');
@@ -71,6 +74,53 @@ export default function ReportarScreen() {
     }
   };
 
+  // Buscar ubicación por dirección (Geocodificación)
+  const buscarUbicacionPorDireccion = async () => {
+    if (!ubicacion.trim()) {
+      Alert.alert('Error', 'Primero escribe una dirección para buscar');
+      return;
+    }
+
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permisos requeridos', 
+          'Se necesita acceso a la ubicación para buscar direcciones. Por favor, concede los permisos en la configuración de tu dispositivo.',
+          [{ text: 'Entendido' }]
+        );
+        return;
+      }
+
+      // Geocodificar la dirección ingresada
+      const results = await Location.geocodeAsync(ubicacion.trim());
+      
+      if (results && results.length > 0) {
+        const location = results[0];
+        setCoordenadas({
+          latitud: location.latitude,
+          longitud: location.longitude
+        });
+        Alert.alert('✅ Ubicación encontrada', 'La ubicación se ha guardado correctamente.');
+      } else {
+        Alert.alert(
+          '❌ Ubicación no encontrada', 
+          'No se pudo encontrar la ubicación. Intenta ser más específico con la dirección (incluye calle, colonia, ciudad).'
+        );
+      }
+    } catch (error) {
+      console.error('Error al buscar ubicación:', error);
+      Alert.alert(
+        'Error de búsqueda', 
+        'No se pudo buscar la ubicación. Verifica tu conexión a internet e intenta nuevamente.',
+        [{ text: 'Entendido' }]
+      );
+    }
+  };
+
+
+
   // Validar formulario 
   const validarFormulario = () => {
     if (!nombre.trim()) {
@@ -114,6 +164,7 @@ export default function ReportarScreen() {
       const fechaISO = fecha ? fecha.toISOString().split('T')[0] : null;
       const horaStr = hora ? `${hora.getHours().toString().padStart(2, '0')}:${hora.getMinutes().toString().padStart(2, '0')}` : null;
 
+      // Cifrar datos sensibles de contacto
       const reporteData = {
         folio: nuevoFolio,
         usuario_id: user.id,
@@ -124,13 +175,16 @@ export default function ReportarScreen() {
         foto_url: foto,
         ropa: ropa.trim() || null,
         ultima_ubicacion: ubicacion.trim(),
+        latitud: coordenadas?.latitud || null,
+        longitud: coordenadas?.longitud || null,
         ultima_fecha_visto: fechaISO,
         ultima_hora_visto: horaStr,
         circunstancias: circunstancias.trim() || null,
-        nombre_reportante: nombreReportante.trim(),
-        relacion_reportante: relacion.trim(),
-        telefono_reportante: telefono.trim(),
-        correo_reportante: correo.trim(),
+        // Datos sensibles cifrados
+        nombre_reportante: encryptSensitiveData(nombreReportante.trim()),
+        relacion_reportante: encryptSensitiveData(relacion.trim()),
+        telefono_reportante: encryptSensitiveData(telefono.trim()),
+        correo_reportante: encryptSensitiveData(correo.trim()),
         denuncia_oficial: denuncia.trim() || null,
         autoridad_notificada: autoridad.trim() || null,
         comentarios: comentarios.trim() || null,
@@ -178,6 +232,7 @@ export default function ReportarScreen() {
     setFoto(null);
     setRopa('');
     setUbicacion('');
+    setCoordenadas(null);
     setFecha(null);
     setHora(null);
     setCircunstancias('');
@@ -263,14 +318,24 @@ export default function ReportarScreen() {
       {/* Información de la desaparición */}
       <Text style={styles.section}>2. Información de la desaparición</Text>
       
+      <Text style={styles.fieldLabel}>Última ubicación donde fue vista la persona:</Text>
       <TextInput
         style={[styles.input, styles.multilineInput]}
-        placeholder="Última ubicación conocida *"
+        placeholder="Ej: Parque Central, Centro de Monterrey, NL - Cerca de la fuente principal *"
         value={ubicacion}
         onChangeText={setUbicacion}
         multiline
-        numberOfLines={2}
+        numberOfLines={3}
       />
+      <Text style={styles.fieldHelper}>
+        💡 Describe el lugar lo más específico posible (calle, colonia, referencias)
+      </Text>
+      
+      <TouchableOpacity style={styles.ubicacionBtn} onPress={buscarUbicacionPorDireccion}>
+        <Text style={styles.ubicacionBtnText}>
+          {coordenadas ? '📍 Buscar ubicación ' : '🔍 Buscar ubicación en mapa'}
+        </Text>
+      </TouchableOpacity>
       
       <TouchableOpacity onPress={() => setShowFecha(true)} style={styles.dateButton}>
         <Text style={{ color: fecha ? '#000' : '#888' }}>
@@ -321,6 +386,15 @@ export default function ReportarScreen() {
 
       {/* Información de contacto */}
       <Text style={styles.section}>3. Información de contacto</Text>
+      
+      <View style={styles.securityNotice}>
+        <Text style={styles.securityNoticeTitle}>🔒 Información Protegida</Text>
+        <Text style={styles.securityNoticeText}>
+          Tus datos de contacto serán cifrados y solo visibles para autoridades y para ti. 
+          Otros usuarios verán información de contacto de la CNB para comunicarse oficialmente.
+        </Text>
+      </View>
+      
       <TextInput 
         style={styles.input} 
         placeholder="Nombre del reportante *" 
@@ -388,7 +462,8 @@ export default function ReportarScreen() {
 
       <Text style={styles.privacidad}>
         Al enviar este reporte aceptas nuestra política de privacidad. 
-        Tu información será protegida y cifrada.
+        Tus datos de contacto serán cifrados por seguridad y solo visibles para autoridades competentes.
+        Otros usuarios verán información de la Comisión Nacional de Búsqueda (CNB) para contacto oficial.
       </Text>
     </ScrollView>
   );
@@ -507,6 +582,50 @@ const styles = StyleSheet.create({
     color: '#1976d2',
     fontSize: 12,
     marginTop: 5,
+  },
+  ubicacionBtn: {
+    backgroundColor: '#9c27b0',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  ubicacionBtnText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  fieldLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#2c3e50',
+    marginBottom: 8,
+    marginTop: 5,
+  },
+  fieldHelper: {
+    fontSize: 12,
+    color: '#7f8c8d',
+    marginBottom: 12,
+    fontStyle: 'italic',
+  },
+  securityNotice: {
+    backgroundColor: '#e3f2fd',
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 15,
+    borderLeftWidth: 4,
+    borderLeftColor: '#1976d2',
+  },
+  securityNoticeTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#1976d2',
+    marginBottom: 5,
+  },
+  securityNoticeText: {
+    fontSize: 12,
+    color: '#1565c0',
+    lineHeight: 18,
   },
   privacidad: {
     marginTop: 20,

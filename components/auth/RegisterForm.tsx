@@ -94,7 +94,7 @@ const RegisterForm = () => {
       }
 
       // Hash de la contraseña
-      const password_hash = hashPassword(password);
+      const password_hash = await hashPassword(password);
       
       // Combinar nombre y apellido para el campo nombre completo
       const nombreCompleto = `${firstName.trim()} ${lastName.trim()}`;

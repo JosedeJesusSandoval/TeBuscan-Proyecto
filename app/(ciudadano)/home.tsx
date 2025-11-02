@@ -2,6 +2,7 @@ import * as Location from 'expo-location';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { obtenerReportesRecientes } from '../../DB/supabase';
 
 export default function HomeScreen() {
   const [userLocation, setUserLocation] = useState<Location.LocationObject | null>(null);
@@ -46,12 +47,72 @@ export default function HomeScreen() {
       const [address] = await Location.reverseGeocodeAsync({ latitude, longitude });
       if (address && address.city) {
         setCiudad(address.city);
+        // Cargar reportes cuando se obtenga la ciudad
+        await cargarReportesCercanos(address.city);
       } else {
         setCiudad('Ciudad desconocida');
       }
     } catch (error) {
       console.error('Error obteniendo la ciudad:', error);
       setCiudad('Error al obtener ciudad');
+    }
+  };
+
+  const cargarReportesCercanos = async (ciudadUsuario: string) => {
+    try {
+      const resultado = await obtenerReportesRecientes(30);
+      
+      if (resultado.success && resultado.data) {
+        // Filtrar reportes por ciudad con lógica mejorada y flexible
+        const reportesFiltrados = resultado.data.filter((reporte: any) => {
+          if (!reporte.ultima_ubicacion) return false;
+          
+          const ubicacionReporte = reporte.ultima_ubicacion.toLowerCase();
+          const ciudadBusqueda = ciudadUsuario.toLowerCase();
+          
+          // Extraer palabras clave de la ciudad del usuario
+          const palabrasCiudad = ciudadBusqueda.split(' ').filter(p => p.length > 2);
+          
+          return ubicacionReporte.includes(ciudadBusqueda) || 
+                 ciudadBusqueda.includes(ubicacionReporte) ||
+                 // Buscar cualquier palabra de la ciudad en la ubicación
+                 palabrasCiudad.some(palabra => ubicacionReporte.includes(palabra)) ||
+                 (ciudadBusqueda.includes('guadalajara') && ubicacionReporte.includes('guadalajara')) ||
+                 (ciudadBusqueda.includes('monterrey') && ubicacionReporte.includes('monterrey')) ||
+                 (ciudadBusqueda.includes('mexico') && ubicacionReporte.includes('mexico')) ||
+                 (ciudadBusqueda.includes('puebla') && ubicacionReporte.includes('puebla')) ||
+                 // Búsqueda por estado y zona metropolitana
+                 (ciudadBusqueda.includes('santa fe') && ubicacionReporte.includes('jalisco')) ||
+                 (ciudadBusqueda.includes('hacienda') && ubicacionReporte.includes('jalisco')) ||
+                 (ciudadBusqueda.includes('santa fe') && (
+                   ubicacionReporte.includes('guadalajara') ||
+                   ubicacionReporte.includes('zapopan') ||
+                   ubicacionReporte.includes('tlaquepaque') ||
+                   ubicacionReporte.includes('tonala') ||
+                   ubicacionReporte.includes('tlajomulco')
+                 ));
+        });
+
+        // Transformar datos para compatibilidad con la UI existente
+        const reportesTransformados = reportesFiltrados.map((reporte: any) => ({
+          id: reporte.id,
+          nombre: reporte.nombre_desaparecido,
+          ultimaUbicacion: reporte.ultima_ubicacion,
+          fechaDesaparicion: reporte.ultima_fecha_visto ? 
+            new Date(reporte.ultima_fecha_visto).toLocaleDateString('es-MX') : 
+            'Fecha no disponible',
+          estado: reporte.estatus === 'desaparecido' ? 'activo' : reporte.estatus,
+          prioridad: 'alta' // Por defecto, se podría mejorar con lógica más específica
+        }));
+
+        setTodosLosReportes(reportesTransformados);
+      } else {
+        console.error('Error al cargar reportes:', resultado.error);
+        setTodosLosReportes([]);
+      }
+    } catch (error) {
+      console.error('Error cargando reportes cercanos:', error);
+      setTodosLosReportes([]);
     }
   };
 
@@ -99,7 +160,6 @@ export default function HomeScreen() {
       
       <Text style={styles.reporteInfo}>📍 {item.ultimaUbicacion}</Text>
       <Text style={styles.reporteInfo}>🕒 {item.fechaDesaparicion}</Text>
-      <Text style={styles.distanciaText}>📏 {item.distancia} km de distancia</Text>
     </TouchableOpacity>
   );
 
@@ -131,11 +191,11 @@ export default function HomeScreen() {
       {/* Estadísticas rápidas */}
       <View style={styles.statsContainer}>
         <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{reportesActivosCercanos.length}</Text> {/* Mostrar el número de casos activos cercanos */}
+          <Text style={styles.statNumber}>{reportesActivosCercanos.length}</Text>
           <Text style={styles.statLabel}>Casos Activos Cercanos</Text>
         </View>
         <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{todosLosReportes.length}</Text> {/* Mostrar el total de reportes en la ciudad */}
+          <Text style={styles.statNumber}>{todosLosReportes.length}</Text>
           <Text style={styles.statLabel}>Total en {ciudad}</Text>
         </View>
       </View>
@@ -308,11 +368,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#2c3e50',
     marginBottom: 3,
-  },
-  distanciaText: {
-    fontSize: 12,
-    color: '#3498db',
-    fontWeight: '600',
   },
   emptyContainer: {
     padding: 40,

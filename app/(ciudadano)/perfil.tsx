@@ -13,7 +13,7 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
-import { actualizarUsuario, cambiarContrasena, obtenerReportesPorUsuario, supabase } from '../../DB/supabase';
+import { actualizarUsuario, cambiarContrasena, obtenerReportesPorUsuarioConContacto, supabase } from '../../DB/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { validatePassword } from '../../utils/passwordValidation';
 
@@ -31,18 +31,17 @@ export default function PerfilScreen() {
   });
   const [userData, setUserData] = useState({
     name: user?.name || '',
-    telefono: user?.telefono || '',
     email: user?.email || ''
   });
   const [saving, setSaving] = useState(false);
 
-  // Cargar reportes del usuario
+  // Cargar reportes del usuario CON información de contacto
   const cargarReportes = async () => {
     if (!user?.id) return;
 
     try {
       setLoading(true);
-      const resultado = await obtenerReportesPorUsuario(user.id);
+      const resultado = await obtenerReportesPorUsuarioConContacto(user.id);
 
       if (resultado.success) {
         setReportes(resultado.data || []);
@@ -71,6 +70,11 @@ export default function PerfilScreen() {
         if (data) {
           console.log('Datos del usuario:', data);
           setUser(data);
+          // Actualizar también el estado local userData
+          setUserData({
+            name: data.name || '',
+            email: data.email || ''
+          });
         } else {
           console.error('Error al cargar usuario:', error);
         }
@@ -85,6 +89,16 @@ export default function PerfilScreen() {
       cargarReportes();
     }
   }, [user?.id]);
+
+  // Sincronizar userData cuando cambie el usuario
+  useEffect(() => {
+    if (user) {
+      setUserData({
+        name: user.name || '',
+        email: user.email || ''
+      });
+    }
+  }, [user]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -212,6 +226,23 @@ export default function PerfilScreen() {
 
       <Text style={styles.reporteInfo}>📍 {item.ultima_ubicacion}</Text>
       <Text style={styles.reporteInfo}>📅 {formatearFecha(item.created_at)}</Text>
+      
+      {/* Información de contacto para reportes propios */}
+      <View style={styles.contactoSection}>
+        <Text style={styles.contactoTitle}>📞 Información de Contacto:</Text>
+        {item.nombre_reportante && (
+          <Text style={styles.contactoInfo}>👤 {item.nombre_reportante}</Text>
+        )}
+        {item.telefono_reportante && (
+          <Text style={styles.contactoInfo}>📱 {item.telefono_reportante}</Text>
+        )}
+        {item.correo_reportante && (
+          <Text style={styles.contactoInfo}>✉️ {item.correo_reportante}</Text>
+        )}
+        {item.relacion_reportante && (
+          <Text style={styles.contactoInfo}>👥 {item.relacion_reportante}</Text>
+        )}
+      </View>
 
       <Text style={styles.verMasText}>Toca para ver detalles →</Text>
     </TouchableOpacity>
@@ -238,9 +269,6 @@ export default function PerfilScreen() {
 
           <Text style={styles.label}>Email:</Text>
           <Text style={styles.value}>{user?.email}</Text>
-
-          <Text style={styles.label}>Teléfono:</Text>
-          <Text style={styles.value}>{user?.telefono || 'No especificado'}</Text>
 
           <Text style={styles.label}>Rol:</Text>
           <Text style={styles.value}>{user?.rol === 'ciudadano' ? 'Ciudadano' : 'Autoridad'}</Text>
@@ -392,14 +420,6 @@ export default function PerfilScreen() {
               placeholder="Nombre completo"
               value={userData.name}
               onChangeText={(text) => setUserData({...userData, name: text})}
-            />
-
-            <TextInput
-              style={styles.input}
-              placeholder="Teléfono"
-              keyboardType="phone-pad"
-              value={userData.telefono}
-              onChangeText={(text) => setUserData({...userData, telefono: text})}
             />
 
             <TextInput
@@ -586,6 +606,25 @@ const styles = StyleSheet.create({
     color: '#3498db',
     fontStyle: 'italic',
     marginTop: 5,
+  },
+  contactoSection: {
+    marginTop: 10,
+    padding: 10,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 6,
+    borderLeftWidth: 3,
+    borderLeftColor: '#3498db',
+  },
+  contactoTitle: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    marginBottom: 6,
+  },
+  contactoInfo: {
+    fontSize: 11,
+    color: '#34495e',
+    marginBottom: 2,
   },
   logoutButton: {
     backgroundColor: '#e74c3c',
