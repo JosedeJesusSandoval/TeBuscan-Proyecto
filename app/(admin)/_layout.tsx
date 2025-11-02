@@ -18,27 +18,6 @@ export default function AdminLayout() {
           headerShown: true 
         }} 
       />
-      <Stack.Screen 
-        name="crear-usuario" 
-        options={{ 
-          title: 'Crear Usuario',
-          headerShown: true 
-        }} 
-      />
-      <Stack.Screen 
-        name="configuracion" 
-        options={{ 
-          title: 'Configuración',
-          headerShown: true 
-        }} 
-      />
-      <Stack.Screen 
-        name="reportes" 
-        options={{ 
-          title: 'Todos los Reportes',
-          headerShown: true 
-        }} 
-      />
     </Stack>
   );
 }

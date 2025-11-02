@@ -104,29 +104,68 @@ export default function UsuariosScreen() {
   const handleSubmit = async () => {
     const { name, email, password, rol, telefono, institucion } = formData;
 
-    if (!name || !email || !password) {
-      Alert.alert('Error', 'Todos los campos son obligatorios.');
+    // Validaciones básicas
+    if (!name.trim() || !email.trim() || !password) {
+      Alert.alert('Error', 'Nombre, email y contraseña son obligatorios.');
       return;
     }
 
+    // Validación específica para autoridades
+    if (rol === 'autoridad' && !institucion?.trim()) {
+      Alert.alert('Error', 'La institución es obligatoria para usuarios de autoridad.');
+      return;
+    }
+
+    // Validación de contraseña
     if (!passwordValidation.isValid) {
-      Alert.alert('Error', 'La contraseña no cumple con los requisitos de seguridad.');
+      Alert.alert(
+        'Contraseña inválida', 
+        'La contraseña debe cumplir todos los requisitos de seguridad mostrados.'
+      );
+      return;
+    }
+
+    // Validación de email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      Alert.alert('Error', 'Por favor ingresa un email válido.');
       return;
     }
 
     try {
+      console.log(`🔄 Creando usuario ${rol}: ${email}`);
+      
       const hashedPassword = await hashPassword(password);
-      const { success, error } = await insertarUsuario(name, email, hashedPassword, rol, telefono, institucion);
+      const { success, error } = await insertarUsuario(
+        name.trim(), 
+        email.trim().toLowerCase(), 
+        hashedPassword, 
+        rol, 
+        telefono?.trim() || '', 
+        institucion?.trim() || ''
+      );
 
       if (success) {
-        Alert.alert('Éxito', `Usuario ${rol} creado: ${email}`);
+        const roleText = rol === 'admin' ? 'Administrador' : 'Autoridad';
+        const statusText = rol === 'admin' ? 
+          'Puede iniciar sesión inmediatamente.' : 
+          'Necesita activación manual antes de poder acceder.';
+          
+        Alert.alert(
+          'Usuario Creado Exitosamente', 
+          `${roleText} creado: ${email}\n\n${statusText}`
+        );
+        
+        console.log(`✅ Usuario ${rol} creado exitosamente: ${email}`);
         fetchUsers();
         handleCloseModal();
       } else {
-        Alert.alert('Error', `No se pudo crear el usuario ${rol}: ${error}`);
+        console.error(`❌ Error creando usuario ${rol}:`, error);
+        Alert.alert('Error al Crear Usuario', error || 'No se pudo crear el usuario.');
       }
     } catch (error) {
-      Alert.alert('Error', 'Ocurrió un problema al procesar la contraseña.');
+      console.error('❌ Error en handleSubmit:', error);
+      Alert.alert('Error', 'Ocurrió un problema inesperado. Intenta nuevamente.');
     }
   };
 
@@ -336,6 +375,98 @@ export default function UsuariosScreen() {
         ))}
       </View>
 
+      {/* Modal para crear usuario */}
+      <Modal visible={modalVisible} animationType="slide" transparent={true}>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>
+              Crear Usuario {formData.rol === 'admin' ? 'Administrador' : 'Autoridad'}
+            </Text>
+
+            <TextInput
+              style={styles.input}
+              placeholder="Nombre completo"
+              value={formData.name}
+              onChangeText={(value) => handleInputChange('name', value)}
+            />
+            
+            <TextInput
+              style={styles.input}
+              placeholder="Correo Electrónico"
+              value={formData.email}
+              onChangeText={(value) => handleInputChange('email', value)}
+              keyboardType="email-address"
+            />
+            
+            <TextInput
+              style={styles.input}
+              placeholder="Contraseña"
+              value={formData.password}
+              onChangeText={(value) => handleInputChange('password', value)}
+              secureTextEntry
+            />
+
+            {/* Mostrar validaciones de contraseña */}
+            {formData.password && formData.password.length > 0 && (
+              <View style={styles.passwordValidation}>
+                <Text style={styles.passwordValidationTitle}>Requisitos de contraseña:</Text>
+                <Text style={{ color: passwordValidation.requirements.length ? '#27ae60' : '#e74c3c' }}>
+                  • Al menos 8 caracteres
+                </Text>
+                <Text style={{ color: passwordValidation.requirements.uppercase ? '#27ae60' : '#e74c3c' }}>
+                  • Una letra mayúscula (A-Z)
+                </Text>
+                <Text style={{ color: passwordValidation.requirements.lowercase ? '#27ae60' : '#e74c3c' }}>
+                  • Una letra minúscula (a-z)
+                </Text>
+                <Text style={{ color: passwordValidation.requirements.number ? '#27ae60' : '#e74c3c' }}>
+                  • Un número (0-9)
+                </Text>
+                <Text style={{ color: passwordValidation.requirements.special ? '#27ae60' : '#e74c3c' }}>
+                  • Un carácter especial (!@#$%^&*)
+                </Text>
+              </View>
+            )}
+
+            <TextInput
+              style={styles.input}
+              placeholder="Teléfono (opcional)"
+              value={formData.telefono}
+              onChangeText={(value) => handleInputChange('telefono', value)}
+              keyboardType="phone-pad"
+            />
+
+            {formData.rol === 'autoridad' && (
+              <TextInput
+                style={styles.input}
+                placeholder="Institución"
+                value={formData.institucion}
+                onChangeText={(value) => handleInputChange('institucion', value)}
+              />
+            )}
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.button, styles.submitButton]}
+                onPress={handleSubmit}
+                disabled={!passwordValidation.isValid || !formData.name || !formData.email}
+              >
+                <Text style={styles.buttonText}>
+                  Crear {formData.rol === 'admin' ? 'Admin' : 'Autoridad'}
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.button, styles.cancelButton]} 
+                onPress={handleCloseModal}
+              >
+                <Text style={styles.buttonText}>Cancelar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Modal para editar usuario */}
       <Modal visible={editModalVisible} animationType="slide" transparent={true}>
         <View style={styles.modalContainer}>
@@ -529,6 +660,12 @@ const styles = StyleSheet.create({
   },
   passwordValidation: {
     marginBottom: 15,
+  },
+  passwordValidationTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    marginBottom: 8,
   },
   modalButtons: {
     flexDirection: 'row',
