@@ -293,7 +293,7 @@ export default function DetalleReporte() {
           <View style={styles.buttonContainer}>
             {reporte.telefono_reportante && (
               <TouchableOpacity style={styles.callButton} onPress={handleCall}>
-                <Text style={styles.buttonText}>📞 Llamar al Reportante</Text>
+                <Text style={styles.buttonText}>📞 Llamar a la autoridad</Text>
               </TouchableOpacity>
             )}
             

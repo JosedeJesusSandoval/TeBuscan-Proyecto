@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Alert, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import {
-  actualizarUsuario,
-  insertarUsuario,
-  obtenerUsuarios
+    actualizarUsuario,
+    insertarUsuario,
+    obtenerUsuarios
 } from '../../DB/supabase';
 import { hashPassword } from '../../utils/crypto';
 import { validatePassword } from '../../utils/passwordValidation';
@@ -234,7 +234,13 @@ export default function UsuariosScreen() {
   };
 
   const handleEditSubmit = async () => {
-    const { id, name, email, password, telefono, institucion } = formData;
+    const { id, name, email, password, telefono, institucion, rol } = formData;
+
+    // Validar que usuarios autoridad tengan institución
+    if (rol === 'autoridad' && !institucion?.trim()) {
+      Alert.alert('Error', 'La institución es obligatoria para usuarios de autoridad.');
+      return;
+    }
 
     try {
       
@@ -268,6 +274,19 @@ export default function UsuariosScreen() {
 
   const handleRoleSubmit = async () => {
     if (selectedUserId === null) return;
+
+    // Si se está cambiando a autoridad, verificar que tenga institución
+    if (selectedRole === 'autoridad') {
+      const usuario = users.find(u => u.id === selectedUserId);
+      if (!usuario?.institucion?.trim()) {
+        Alert.alert(
+          'Institución Requerida',
+          'Para cambiar el rol a autoridad, primero debe agregar una institución. Use la opción "Editar" para agregar la institución.',
+          [{ text: 'Entendido' }]
+        );
+        return;
+      }
+    }
 
     try {
       const { success, error } = await actualizarUsuario(selectedUserId, { rol: selectedRole });
@@ -523,7 +542,7 @@ export default function UsuariosScreen() {
             />
             <TextInput
               style={styles.input}
-              placeholder="Institución"
+              placeholder={formData.rol === 'autoridad' ? "Institución *" : "Institución"}
               value={formData.institucion}
               onChangeText={(value) => handleInputChange('institucion', value)}
             />

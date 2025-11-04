@@ -40,7 +40,6 @@ export default function ReportarScreen() {
   // Estados opcionales
   const [denuncia, setDenuncia] = useState('');
   const [autoridad, setAutoridad] = useState('');
-  const [comentarios, setComentarios] = useState('');
   
   const [folio, setFolio] = useState<string | null>(null);
 
@@ -187,7 +186,7 @@ export default function ReportarScreen() {
         correo_reportante: encryptSensitiveData(correo.trim()),
         denuncia_oficial: denuncia.trim() || null,
         autoridad_notificada: autoridad.trim() || null,
-        comentarios: comentarios.trim() || null,
+        comentarios: null, // Reservado para notas de autoridades
         estatus: 'desaparecido',
         created_at: new Date().toISOString(),
       };
@@ -242,7 +241,6 @@ export default function ReportarScreen() {
     setCorreo('');
     setDenuncia('');
     setAutoridad('');
-    setComentarios('');
   };
 
   return (
@@ -438,14 +436,7 @@ export default function ReportarScreen() {
         value={autoridad} 
         onChangeText={setAutoridad} 
       />
-      <TextInput 
-        style={[styles.input, styles.multilineInput]} 
-        placeholder="Comentarios adicionales" 
-        value={comentarios} 
-        onChangeText={setComentarios} 
-        multiline 
-        numberOfLines={3}
-      />
+
 
       {/* Botón de enviar */}
       <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>

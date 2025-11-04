@@ -502,6 +502,54 @@ export const obtenerReportesRecientes = async (limite = 10) => {
   }
 };
 
+// Obtener todos los reportes (para autoridades)
+export const obtenerReportes = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('reportes')
+      .select(`
+        id,
+        nombre_desaparecido,
+        edad,
+        descripcion,
+        ultima_ubicacion,
+        ultima_fecha_visto,
+        estatus,
+        created_at,
+        usuario_id,
+        usuarios(name)
+      `)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, data: data };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+};
+
+// Actualizar reporte
+export const actualizarReporte = async (reporteId, datosActualizacion) => {
+  try {
+    const { data, error } = await supabase
+      .from('reportes')
+      .update(datosActualizacion)
+      .eq('id', reporteId)
+      .select();
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, data: data[0] };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+};
+
 // Obtener reporte por ID con información de contacto según permisos
 export const obtenerReportePorId = async (id, usuarioActual = null) => {
   try {
@@ -902,6 +950,54 @@ export const obtenerReportesConContacto = async (usuarioId, rolUsuario, limite =
   }
 };
 
+export const obtenerReportesPorJurisdiccion = async (jurisdiccionAutoridad) => {
+  try {
+    const { data, error } = await supabase
+      .from('reportes')
+      .select(`
+        id,
+        nombre_desaparecido,
+        edad,
+        descripcion,
+        ultima_ubicacion,
+        municipio,
+        ultima_fecha_visto,
+        estatus,
+        created_at,
+        usuario_id,
+        usuarios(name)
+      `)
+      .eq('municipio', jurisdiccionAutoridad)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, data: data };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+};
+
+export const obtenerInfoAutoridad = async (usuarioId) => {
+  try {
+    const { data, error } = await supabase
+      .from('usuarios')
+      .select('id, name, institucion, jurisdiccion, rol')
+      .eq('id', usuarioId)
+      .single();
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, data: data };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+};
+
 // ============ FUNCIONES DE SEGUIMIENTOS ============
 
 // Agregar seguimiento
@@ -942,3 +1038,4 @@ export const agregarSeguimiento = async (reporteId, autoridadId, comentario, nue
     return { success: false, error: error.message };
   }
 };
+
