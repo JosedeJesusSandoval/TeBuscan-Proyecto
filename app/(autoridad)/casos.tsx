@@ -37,22 +37,36 @@ export default function CasosScreen() {
   }, []);
 
   const inicializarDatos = async () => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      console.log('❌ No hay usuario logueado');
+      return;
+    }
     
     try {
+      console.log('🚀 Inicializando datos para usuario:', user.name);
+      
       // Primero obtener información de la autoridad
       const infoResult = await obtenerInfoAutoridad(user.id);
+      console.log('📋 Resultado info autoridad:', infoResult);
+      
       if (infoResult.success && infoResult.data) {
         setAutoridad(infoResult.data);
         setJurisdiccion(infoResult.data.jurisdiccion || '');
         
+        console.log('✅ Información de autoridad cargada:', {
+          nombre: infoResult.data.name,
+          institucion: infoResult.data.institucion,
+          jurisdiccion: infoResult.data.jurisdiccion
+        });
+        
         // Luego cargar reportes de su jurisdicción
         await cargarReportes(infoResult.data.jurisdiccion);
       } else {
-        Alert.alert('Error', 'No se pudo obtener información de la autoridad');
+        console.error('❌ Error obteniendo info de autoridad:', infoResult.error);
+        Alert.alert('Error', 'No se pudo obtener información de la autoridad: ' + (infoResult.error || 'Error desconocido'));
       }
     } catch (error) {
-      console.error('Error inicializando datos:', error);
+      console.error('❌ Error inicializando datos:', error);
       Alert.alert('Error', 'Problema al inicializar los datos');
     }
   };
@@ -62,21 +76,29 @@ export default function CasosScreen() {
       setLoading(true);
       const jurisdiccionActual = jurisdiccionParam || jurisdiccion;
       
-      if (!jurisdiccionActual) {
-        Alert.alert('Error', 'No se ha definido la jurisdicción de la autoridad');
-        return;
-      }
+      console.log('🔍 Cargando reportes para autoridad:', user?.name);
+      console.log('📍 Jurisdicción:', jurisdiccionActual);
 
-      // Usar la función específica para obtener reportes por jurisdicción
-      const resultado = await obtenerReportesPorJurisdiccion(jurisdiccionActual);
+      // Siempre intentar obtener reportes por jurisdicción (la función ahora maneja fallbacks internamente)
+      const resultado = await obtenerReportesPorJurisdiccion(jurisdiccionActual || 'Todos');
       
-      if (!resultado.success || !resultado.data) {
+      if (!resultado.success) {
+        console.error('❌ Error en obtenerReportesPorJurisdiccion:', resultado.error);
         Alert.alert('Error', resultado.error || 'No se pudieron cargar los reportes');
         return;
       }
 
+      const reportesData = resultado.data || [];
+      console.log(`✅ Cargados ${reportesData.length} reportes`);
+
+      if (reportesData.length === 0) {
+        console.log('⚠️ No se encontraron reportes');
+        setReportes([]);
+        return;
+      }
+
       // Aplicar clasificación inteligente de urgencia
-      const reportesConPrioridad = resultado.data.map((reporte: any) => ({
+      const reportesConPrioridad = reportesData.map((reporte: any) => ({
         ...reporte,
         ...calcularPrioridad(reporte)
       }));
@@ -92,8 +114,8 @@ export default function CasosScreen() {
 
       setReportes(reportesConPrioridad);
     } catch (error) {
-      console.error('Error cargando reportes:', error);
-      Alert.alert('Error', 'Problema al cargar los reportes');
+      console.error('❌ Error cargando reportes:', error);
+      Alert.alert('Error', 'Problema al cargar los reportes: ' + (error instanceof Error ? error.message : String(error)));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -214,7 +236,20 @@ export default function CasosScreen() {
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
+              <Text style={styles.emptyIcon}>🔍</Text>
               <Text style={styles.emptyText}>No hay casos registrados</Text>
+              <Text style={styles.emptySubtext}>
+                {jurisdiccion 
+                  ? `No se encontraron reportes para la jurisdicción: ${jurisdiccion}`
+                  : 'No se encontraron reportes en el sistema'
+                }
+              </Text>
+              <TouchableOpacity 
+                style={styles.refreshButton} 
+                onPress={() => cargarReportes()}
+              >
+                <Text style={styles.refreshButtonText}>🔄 Actualizar</Text>
+              </TouchableOpacity>
             </View>
           }
         />
@@ -475,10 +510,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 40,
   },
+  emptyIcon: {
+    fontSize: 64,
+    marginBottom: 20,
+  },
   emptyText: {
-    fontSize: 16,
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  emptySubtext: {
+    fontSize: 14,
     color: '#7f8c8d',
     textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 30,
+  },
+  refreshButton: {
+    backgroundColor: '#3498db',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 25,
+    elevation: 2,
+  },
+  refreshButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   reporteCard: {
     backgroundColor: 'white',

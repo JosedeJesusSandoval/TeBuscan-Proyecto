@@ -1,12 +1,14 @@
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { onAuthStateChange, supabase } from '../DB/supabase';
+import { reportError, safeAsyncCall } from '../utils/crashHandler';
 
 interface User {
   id: string;
   name: string;
   email: string;
   telefono?: string;
-  rol?: string; 
+  rol?: string;
+  jurisdiccion?: string;
 }
 
 interface AuthContextProps {
@@ -24,29 +26,42 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isPasswordResetMode, setPasswordResetMode] = useState(false);
 
   useEffect(() => {
-    // Cargar usuario inicial si hay una sesión activa
+    // Cargar usuario inicial si hay una sesión activa con manejo de errores
     const cargarUsuarioInicial = async () => {
-      try {
-        const { data: sessionData } = await supabase.auth.getSession();
-        if (sessionData.session) {
-          const { data: userData, error } = await supabase
-            .from('usuarios')
-            .select('id, name, telefono, email, rol')
-            .eq('id', sessionData.session.user.id)
-            .single();
+      const result = await safeAsyncCall(
+        async () => {
+          const { data: sessionData } = await supabase.auth.getSession();
+          if (sessionData.session) {
+            const { data: userData, error } = await supabase
+              .from('usuarios')
+              .select('id, name, telefono, email, rol, jurisdiccion')
+              .eq('id', sessionData.session.user.id)
+              .single();
 
-          if (userData && !error) {
-            setUser(userData);
+            if (userData && !error) {
+              setUser(userData);
+              return userData;
+            }
           }
+          return null;
+        },
+        'No se pudo cargar la sesión del usuario',
+        (error) => {
+          reportError(error, 'cargarUsuarioInicial');
+          // No mostrar alert aquí, solo loguear el error
+          console.warn('⚠️ Error cargando usuario inicial, continuando sin sesión');
         }
-      } catch (error) {
-        console.error('Error al cargar usuario inicial:', error);
+      );
+
+      if (!result) {
+        // Si falla la carga inicial, limpiar cualquier estado inconsistente
+        setUser(null);
       }
     };
 
     cargarUsuarioInicial();
 
-    // Escuchar cambios en el estado de autenticación de Supabase
+    // Escuchar cambios en el estado de autenticación con manejo de errores
     const { data: { subscription } } = onAuthStateChange((event: any, session: any) => {
       console.log('Auth event:', event, session);
       
@@ -57,17 +72,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(null);
         setPasswordResetMode(false);
       } else if (event === 'SIGNED_IN' && session?.user) {
-        // Cargar datos completos del usuario al iniciar sesión
+        // Cargar datos completos del usuario al iniciar sesión con manejo de errores
         const cargarDatosUsuario = async () => {
-          const { data: userData, error } = await supabase
-            .from('usuarios')
-            .select('id, name, telefono, email, rol')
-            .eq('id', session.user.id)
-            .single();
+          await safeAsyncCall(
+            async () => {
+              const { data: userData, error } = await supabase
+                .from('usuarios')
+                .select('id, name, telefono, email, rol, jurisdiccion')
+                .eq('id', session.user.id)
+                .single();
 
-          if (userData && !error) {
-            setUser(userData);
-          }
+              if (userData && !error) {
+                setUser(userData);
+                return userData;
+              }
+              throw new Error(error?.message || 'No se pudo cargar la información del usuario');
+            },
+            'Error al cargar información del usuario después del login',
+            (error) => {
+              reportError(error, 'cargarDatosUsuario');
+              // En caso de error, establecer datos mínimos del usuario
+              setUser({
+                id: session.user.id,
+                name: session.user.email || 'Usuario',
+                email: session.user.email || '',
+              });
+            }
+          );
         };
         cargarDatosUsuario();
       }
@@ -79,13 +110,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const logout = async () => {
-    try {
-      await supabase.auth.signOut();
-      setUser(null);
-      setPasswordResetMode(false);
-    } catch (error) {
-      console.error('Error al cerrar sesión:', error);
-    }
+    await safeAsyncCall(
+      async () => {
+        await supabase.auth.signOut();
+        setUser(null);
+        setPasswordResetMode(false);
+        return true;
+      },
+      'Error al cerrar sesión',
+      (error) => {
+        reportError(error, 'logout');
+        // Aún así limpiar el estado local
+        setUser(null);
+        setPasswordResetMode(false);
+      }
+    );
   };
 
   return (

@@ -10,13 +10,20 @@ export default function MapaScreen() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [reportes, setReportes] = useState<any[]>([]);
-  const [filtroEstatus, setFiltroEstatus] = useState<string>('desaparecido');
+  const [filtroEstatus, setFiltroEstatus] = useState<string>('desaparecido'); // Por defecto mostrar solo desaparecidos
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
 
   useEffect(() => {
     getCurrentLocation();
     fetchReportes(filtroEstatus);
   }, []);
+
+  // Refrescar reportes cuando cambie el filtro
+  useEffect(() => {
+    if (filtroEstatus) {
+      fetchReportes(filtroEstatus);
+    }
+  }, [filtroEstatus]);
 
   const getCurrentLocation = async () => {
     try {
@@ -62,27 +69,47 @@ export default function MapaScreen() {
 
   const fetchReportes = async (estatus?: string) => {
     try {
+      console.log(`🗺️ Cargando reportes para mapa con estatus: ${estatus || 'todos'}`);
+      
       const filtros: any = { dias_recientes: 365 };
       
       if (estatus && estatus !== 'todos') {
         filtros.estatus = estatus;
+        console.log(`🔍 Aplicando filtro de estatus: ${estatus}`);
       }
 
       const resultado = await obtenerReportesParaMapa(filtros);
 
       if (resultado.success) {
+        console.log(`📊 Reportes obtenidos para mapa: ${resultado.data?.length || 0}`);
+        
+        // Debug: mostrar distribución de estatus
+        if (resultado.data && resultado.data.length > 0) {
+          const distribucion = resultado.data.reduce((acc: any, reporte: any) => {
+            acc[reporte.estatus] = (acc[reporte.estatus] || 0) + 1;
+            return acc;
+          }, {});
+          console.log('📈 Distribución de estatus en mapa:', distribucion);
+          
+          // Mostrar algunos ejemplos
+          resultado.data.slice(0, 3).forEach((reporte: any, index: number) => {
+            console.log(`${index + 1}. ${reporte.nombre_desaparecido} - ${reporte.estatus} - Coords: ${reporte.latitud}, ${reporte.longitud}`);
+          });
+        }
+        
         setReportes(resultado.data || []);
       } else {
-        console.error('Error obteniendo reportes:', resultado.error);
+        console.error('Error obteniendo reportes para mapa:', resultado.error);
         setReportes([]);
       }
     } catch (error) {
-      console.error('Error obteniendo reportes:', error);
+      console.error('Error obteniendo reportes para mapa:', error);
       setReportes([]);
     }
   };
 
   const cambiarFiltro = (nuevoEstatus: string) => {
+    console.log(`🔄 Cambiando filtro de mapa de '${filtroEstatus}' a '${nuevoEstatus}'`);
     setFiltroEstatus(nuevoEstatus);
     fetchReportes(nuevoEstatus);
     setMostrarFiltros(false);
@@ -137,7 +164,10 @@ export default function MapaScreen() {
           onPress={() => setMostrarFiltros(!mostrarFiltros)}
         >
           <Text style={styles.filterButtonText}>
-            Filtros: {filtroEstatus === 'todos' ? 'Todos' : filtroEstatus.toUpperCase()} ({reportes.length})
+            {filtroEstatus === 'todos' ? '📋 Todos' : 
+             filtroEstatus === 'desaparecido' ? '🔴 Desaparecidos' :
+             filtroEstatus === 'encontrado' ? '🟢 Encontrados' : filtroEstatus.toUpperCase()
+            } ({reportes.length})
           </Text>
         </TouchableOpacity>
         
@@ -183,22 +213,27 @@ export default function MapaScreen() {
         mapType="standard"
       >
         {/* Marcadores de reportes */}
-        {reportes.map((reporte) => (
-          <Marker
-            key={reporte.id}
-            coordinate={{
-              latitude: reporte.latitud,
-              longitude: reporte.longitud,
-            }}
-            title={reporte.nombre_desaparecido}
-            description={`${reporte.estatus} - ${reporte.ultima_ubicacion}`}
-            pinColor={
-              reporte.estatus === 'desaparecido' ? '#e74c3c' : 
-              reporte.estatus === 'encontrado' ? '#27ae60' : '#f39c12'
-            }
-            onPress={() => handleMarkerPress(reporte)}
-          />
-        ))}
+        {reportes.map((reporte) => {
+          const pinColor = reporte.estatus === 'desaparecido' ? '#e74c3c' : 
+                          reporte.estatus === 'encontrado' ? '#27ae60' : '#f39c12';
+          
+          const emoji = reporte.estatus === 'desaparecido' ? '🔴' : 
+                       reporte.estatus === 'encontrado' ? '🟢' : '🟡';
+          
+          return (
+            <Marker
+              key={reporte.id}
+              coordinate={{
+                latitude: parseFloat(reporte.latitud),
+                longitude: parseFloat(reporte.longitud),
+              }}
+              title={`${emoji} ${reporte.nombre_desaparecido}`}
+              description={`Estado: ${reporte.estatus.toUpperCase()} - ${reporte.ultima_ubicacion}`}
+              pinColor={pinColor}
+              onPress={() => handleMarkerPress(reporte)}
+            />
+          );
+        })}
       </MapView>
 
       {/* Botón flotante para reportar */}
@@ -210,6 +245,20 @@ export default function MapaScreen() {
       {errorMsg && (
         <View style={styles.errorBanner}>
           <Text style={styles.errorBannerText}>📍 {errorMsg}</Text>
+        </View>
+      )}
+
+      {/* Mensaje informativo cuando no hay reportes */}
+      {reportes.length === 0 && !loading && (
+        <View style={styles.infoBanner}>
+          <Text style={styles.infoBannerText}>
+            {filtroEstatus === 'encontrado' 
+              ? '🟢 No hay reportes de personas encontradas en este momento'
+              : filtroEstatus === 'desaparecido'
+              ? '🔴 No hay reportes de personas desaparecidas cerca'
+              : '📋 No hay reportes disponibles con coordenadas'
+            }
+          </Text>
         </View>
       )}
     </View>
@@ -268,6 +317,21 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 12,
     textAlign: 'center',
+  },
+  infoBanner: {
+    position: 'absolute',
+    bottom: 100,
+    left: 20,
+    right: 20,
+    backgroundColor: 'rgba(52, 152, 219, 0.9)',
+    padding: 12,
+    borderRadius: 8,
+  },
+  infoBannerText: {
+    color: 'white',
+    fontSize: 12,
+    textAlign: 'center',
+    fontWeight: '500',
   },
   filterPanel: {
     position: 'absolute',

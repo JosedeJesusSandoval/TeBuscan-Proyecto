@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { obtenerInfoAutoridad, obtenerReportes, obtenerReportesPorJurisdiccion } from '../../DB/supabase';
+import { obtenerInfoAutoridad, obtenerReportesPorJurisdiccion } from '../../DB/supabase';
 import { useAuth } from '../../context/AuthContext';
 
 export default function AutoridadPanel() {
@@ -57,26 +57,22 @@ export default function AutoridadPanel() {
     try {
       const jurisdiccionActual = jurisdiccionParam || jurisdiccion;
       
-      if (!jurisdiccionActual) {
-        console.warn('No se ha definido jurisdicción, usando reportes generales');
-        // Fallback a obtener todos los reportes si no hay jurisdicción
-        const response = await obtenerReportes();
-        if (!response.success) {
-          throw new Error(response.error || 'Error obteniendo reportes');
-        }
-        procesarEstadisticas(response.data || []);
-        return;
-      }
+      console.log('📊 Cargando estadísticas para jurisdicción:', jurisdiccionActual);
 
-      // Usar la función específica para obtener reportes por jurisdicción
-      const response = await obtenerReportesPorJurisdiccion(jurisdiccionActual);
+      // Usar la función mejorada para obtener reportes por jurisdicción
+      const response = await obtenerReportesPorJurisdiccion(jurisdiccionActual || 'Todos');
+      
       if (!response.success) {
+        console.error('❌ Error cargando reportes para estadísticas:', response.error);
         throw new Error(response.error || 'Error obteniendo reportes de la jurisdicción');
       }
+
+      const reportesData = response.data || [];
+      console.log(`✅ Procesando estadísticas de ${reportesData.length} reportes`);
       
-      procesarEstadisticas(response.data || []);
+      procesarEstadisticas(reportesData);
     } catch (error) {
-      console.error('Error cargando estadísticas:', error);
+      console.error('❌ Error cargando estadísticas:', error);
       setEstadisticas(prev => ({ ...prev, loading: false }));
     } finally {
       setRefreshing(false);

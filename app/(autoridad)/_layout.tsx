@@ -25,6 +25,7 @@ export default function AutoridadLayout() {
           headerShown: true 
         }} 
       />
+
     </Stack>
   );
 }

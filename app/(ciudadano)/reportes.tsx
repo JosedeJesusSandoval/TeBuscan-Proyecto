@@ -6,32 +6,78 @@ import { obtenerReportesRecientes } from '../../DB/supabase';
 
 export default function ReportesScreen() {
   const [reportes, setReportes] = useState<any[]>([]);
+  const [reportesTodos, setReportesTodos] = useState<any[]>([]); // Todos los reportes sin filtro
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [ciudadUsuario, setCiudadUsuario] = useState<string>(''); 
+  const [ciudadUsuario, setCiudadUsuario] = useState<string>('');
+  const [filtroEstado, setFiltroEstado] = useState<'todos' | 'desaparecidos' | 'encontrados'>('desaparecidos'); // Filtro por defecto: desaparecidos
+
+  // Función para aplicar filtros de estado
+  const aplicarFiltroEstado = (reportesBase: any[]) => {
+    console.log(`🔍 Aplicando filtro de estado: ${filtroEstado}`);
+    console.log(`📊 Reportes base para filtrar: ${reportesBase.length}`);
+    
+    let reportesFiltrados = [];
+    
+    switch (filtroEstado) {
+      case 'todos':
+        reportesFiltrados = reportesBase;
+        break;
+      case 'desaparecidos':
+        reportesFiltrados = reportesBase.filter(reporte => reporte.estatus === 'desaparecido');
+        break;
+      case 'encontrados':
+        reportesFiltrados = reportesBase.filter(reporte => reporte.estatus === 'encontrado');
+        break;
+      default:
+        reportesFiltrados = reportesBase;
+    }
+    
+    console.log(`✅ Reportes después del filtro '${filtroEstado}': ${reportesFiltrados.length}`);
+    
+    // Debug: mostrar distribución de estatus
+    const distribucion = reportesBase.reduce((acc, reporte) => {
+      acc[reporte.estatus] = (acc[reporte.estatus] || 0) + 1;
+      return acc;
+    }, {} as any);
+    console.log('📈 Distribución de estatus:', distribucion);
+    
+    setReportes(reportesFiltrados);
+  };
+
+  // Función para cambiar filtro de estado
+  const cambiarFiltroEstado = (nuevoFiltro: 'todos' | 'desaparecidos' | 'encontrados') => {
+    console.log(`🔄 Cambiando filtro de '${filtroEstado}' a '${nuevoFiltro}'`);
+    setFiltroEstado(nuevoFiltro);
+    aplicarFiltroEstado(reportesTodos);
+  }; 
 
   const cargarReportes = async () => {
     try {
       setLoading(true);
-      const resultado = await obtenerReportesRecientes(50); // Aumentamos el límite para tener más datos que filtrar
+      console.log('🔄 Cargando reportes...');
+      
+      const resultado = await obtenerReportesRecientes(50);
 
       if (resultado.success && resultado.data) {
         console.log(`📊 Total de reportes obtenidos: ${resultado.data.length}`);
-        console.log(`🏙️ Filtrando por ciudad: ${ciudadUsuario}`);
         
-        // Debug: Mostrar todos los reportes disponibles
-        console.log('📋 Reportes disponibles:');
-        resultado.data.forEach((reporte: any, index: number) => {
-          console.log(`${index + 1}. ${reporte.nombre_desaparecido} - ${reporte.ultima_ubicacion}`);
+        // Debug: Mostrar algunos reportes disponibles
+        console.log('📋 Primeros reportes disponibles:');
+        resultado.data.slice(0, 5).forEach((reporte: any, index: number) => {
+          console.log(`${index + 1}. ${reporte.nombre_desaparecido} - ${reporte.ultima_ubicacion} - ${reporte.estatus}`);
         });
         
-        // Si no tenemos ciudad del usuario, mostrar todos
+        // Usar la misma lógica de filtrado exitosa de home.tsx
+        let reportesFiltrados = [];
         if (!ciudadUsuario) {
-          console.log('⚠️ Sin ciudad detectada, mostrando todos los reportes');
-          setReportes(resultado.data || []);
+          console.log('⚠️ Sin ubicación detectada, mostrando todos los reportes');
+          reportesFiltrados = resultado.data || [];
         } else {
-          // Filtrar por ciudad del usuario con múltiples criterios de coincidencia MÁS FLEXIBLES
-          const reportesCercanos = resultado.data.filter((reporte: any) => {
+          console.log(`🔍 Filtrando reportes para: ${ciudadUsuario}`);
+          
+          // Filtrar reportes por ciudad con lógica mejorada y flexible (igual que home.tsx)
+          reportesFiltrados = resultado.data.filter((reporte: any) => {
             if (!reporte.ultima_ubicacion) return false;
             
             const ubicacionReporte = reporte.ultima_ubicacion.toLowerCase();
@@ -40,25 +86,17 @@ export default function ReportesScreen() {
             // Extraer palabras clave de la ciudad del usuario
             const palabrasCiudad = ciudadBusqueda.split(' ').filter(p => p.length > 2);
             
-            // Buscar coincidencias más flexibles
-            const coincide = 
-                   // Coincidencia directa
-                   ubicacionReporte.includes(ciudadBusqueda) || 
+            const coincide = ubicacionReporte.includes(ciudadBusqueda) || 
                    ciudadBusqueda.includes(ubicacionReporte) ||
                    // Buscar cualquier palabra de la ciudad en la ubicación
                    palabrasCiudad.some(palabra => ubicacionReporte.includes(palabra)) ||
-                   // Comparar palabras clave de ciudades principales
                    (ciudadBusqueda.includes('guadalajara') && ubicacionReporte.includes('guadalajara')) ||
                    (ciudadBusqueda.includes('monterrey') && ubicacionReporte.includes('monterrey')) ||
                    (ciudadBusqueda.includes('mexico') && ubicacionReporte.includes('mexico')) ||
                    (ciudadBusqueda.includes('puebla') && ubicacionReporte.includes('puebla')) ||
-                   (ciudadBusqueda.includes('tijuana') && ubicacionReporte.includes('tijuana')) ||
-                   (ciudadBusqueda.includes('leon') && ubicacionReporte.includes('leon')) ||
-                   (ciudadBusqueda.includes('juarez') && ubicacionReporte.includes('juarez')) ||
-                   // Búsqueda por estado (Jalisco en este caso)
+                   // Búsqueda por estado y zona metropolitana (IGUAL que home.tsx)
                    (ciudadBusqueda.includes('santa fe') && ubicacionReporte.includes('jalisco')) ||
                    (ciudadBusqueda.includes('hacienda') && ubicacionReporte.includes('jalisco')) ||
-                   // Búsqueda por zona metropolitana de Guadalajara
                    (ciudadBusqueda.includes('santa fe') && (
                      ubicacionReporte.includes('guadalajara') ||
                      ubicacionReporte.includes('zapopan') ||
@@ -69,23 +107,28 @@ export default function ReportesScreen() {
             
             if (coincide) {
               console.log(`✅ Reporte coincidente: ${reporte.nombre_desaparecido} en ${reporte.ultima_ubicacion}`);
-            } else {
-              console.log(`❌ No coincide: ${reporte.nombre_desaparecido} en ${reporte.ultima_ubicacion}`);
             }
             
             return coincide;
           });
-          
-          console.log(`🎯 Reportes filtrados para ${ciudadUsuario}: ${reportesCercanos.length}`);
-          setReportes(reportesCercanos || []);
         }
+
+        console.log(`🎯 Reportes filtrados: ${reportesFiltrados.length}`);
+
+        // Guardar todos los reportes filtrados por ubicación
+        setReportesTodos(reportesFiltrados || []);
+        
+        // Aplicar filtro de estado
+        aplicarFiltroEstado(reportesFiltrados || []);
       } else {
         console.error('Error al cargar reportes:', resultado.error || 'Datos no disponibles');
         setReportes([]);
+        setReportesTodos([]);
       }
     } catch (error) {
       console.error('Error al cargar reportes:', error);
       setReportes([]);
+      setReportesTodos([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -116,10 +159,17 @@ export default function ReportesScreen() {
 
       if (addressInfo && addressInfo.length > 0) {
         const address = addressInfo[0];
-        // Priorizar ciudad, luego región, luego distrito
-        const ciudad = address.city || address.region || address.district || address.subregion || '';
-        console.log('Ciudad detectada:', ciudad);
-        setCiudadUsuario(ciudad);
+        
+        // Usar exactamente la misma lógica que home.tsx
+        if (address && address.city) {
+          console.log('🏙️ Ciudad detectada:', address.city);
+          setCiudadUsuario(address.city);
+          // Cargar reportes inmediatamente después de obtener la ciudad (como home.tsx)
+          // cargarReportes se ejecutará automáticamente por el useEffect
+        } else {
+          console.log('No se pudo obtener información de la ciudad');
+          setCiudadUsuario('Ciudad desconocida');
+        }
       } else {
         console.log('No se pudo obtener información de la ciudad');
         setCiudadUsuario('');
@@ -138,12 +188,20 @@ export default function ReportesScreen() {
     inicializar();
   }, []);
 
-  // Cargar reportes cuando cambie la ciudad
+  // Cargar reportes cuando cambie la ciudad (igual que home.tsx)
   useEffect(() => {
-    if (ciudadUsuario !== '') {
+    if (ciudadUsuario) {
+      console.log('🔄 Cargando reportes para ciudad:', ciudadUsuario);
       cargarReportes();
     }
   }, [ciudadUsuario]);
+
+  // Aplicar filtro de estado cuando cambien los reportes base o el filtro
+  useEffect(() => {
+    if (reportesTodos.length > 0) {
+      aplicarFiltroEstado(reportesTodos);
+    }
+  }, [filtroEstado]);
 
   // Función para refrescar
   const onRefresh = () => {
@@ -262,10 +320,61 @@ export default function ReportesScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>Reportes cercanos</Text>
         {ciudadUsuario ? (
-          <Text style={styles.locationText}>📍 {ciudadUsuario}</Text>
+          <Text style={styles.locationText}>📍 Filtrando por: {ciudadUsuario}</Text>
         ) : (
-          <Text style={styles.locationText}>📍 Ubicación no disponible</Text>
+          <Text style={styles.locationText}>📍 Mostrando todos los reportes (ubicación no disponible)</Text>
         )}
+      </View>
+
+      {/* Filtros de estado */}
+      <View style={styles.filtersContainer}>
+        <Text style={styles.filtersTitle}>Filtrar por:</Text>
+        <View style={styles.filtersButtonsContainer}>
+          <TouchableOpacity
+            style={[
+              styles.filterButton,
+              filtroEstado === 'desaparecidos' && styles.filterButtonActive
+            ]}
+            onPress={() => cambiarFiltroEstado('desaparecidos')}
+          >
+            <Text style={[
+              styles.filterButtonText,
+              filtroEstado === 'desaparecidos' && styles.filterButtonTextActive
+            ]}>
+              🔴 Desaparecidos ({reportesTodos.filter(r => r.estatus === 'desaparecido').length})
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[
+              styles.filterButton,
+              filtroEstado === 'encontrados' && styles.filterButtonActive
+            ]}
+            onPress={() => cambiarFiltroEstado('encontrados')}
+          >
+            <Text style={[
+              styles.filterButtonText,
+              filtroEstado === 'encontrados' && styles.filterButtonTextActive
+            ]}>
+              🟢 Encontrados ({reportesTodos.filter(r => r.estatus === 'encontrado').length})
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[
+              styles.filterButton,
+              filtroEstado === 'todos' && styles.filterButtonActive
+            ]}
+            onPress={() => cambiarFiltroEstado('todos')}
+          >
+            <Text style={[
+              styles.filterButtonText,
+              filtroEstado === 'todos' && styles.filterButtonTextActive
+            ]}>
+              📋 Todos ({reportesTodos.length})
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {reportes.length === 0 ? (
@@ -422,6 +531,47 @@ const styles = StyleSheet.create({
   mapButtonText: {
     color: 'white',
     fontSize: 10,
+    fontWeight: 'bold',
+  },
+  // Estilos para filtros
+  filtersContainer: {
+    backgroundColor: 'white',
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ecf0f1',
+  },
+  filtersTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2c3e50',
+    marginBottom: 10,
+  },
+  filtersButtonsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  filterButton: {
+    backgroundColor: '#ecf0f1',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#bdc3c7',
+    flexShrink: 1,
+  },
+  filterButtonActive: {
+    backgroundColor: '#3498db',
+    borderColor: '#2980b9',
+  },
+  filterButtonText: {
+    fontSize: 12,
+    color: '#7f8c8d',
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  filterButtonTextActive: {
+    color: '#fff',
     fontWeight: 'bold',
   },
 });

@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import Constants from 'expo-constants';
+import { reportError, safeAsyncCall } from '../utils/crashHandler';
 import { decryptSensitiveData, hashPassword } from '../utils/crypto';
 
 const supabaseUrl = Constants.expoConfig?.extra?.supabaseUrl || process.env.EXPO_PUBLIC_SUPABASE_URL;
@@ -10,9 +11,9 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 // ============ FUNCIONES DE USUARIOS ============
 
 // Insertar usuario con rol
-export const insertarUsuario = async (name, email, password_hash, rol = 'ciudadano', telefono = '', institucion = '') => {
+export const insertarUsuario = async (name, email, password_hash, rol = 'ciudadano', telefono = '', institucion = '', jurisdiccion = '') => {
   try {
-    console.log('Datos enviados a Supabase:', { name, email, password_hash, rol, telefono, institucion });
+    console.log('Datos enviados a Supabase:', { name, email, password_hash, rol, telefono, institucion, jurisdiccion });
 
     const { data, error } = await supabase
       .from('usuarios')
@@ -24,6 +25,7 @@ export const insertarUsuario = async (name, email, password_hash, rol = 'ciudada
           rol,
           telefono,
           institucion,
+          jurisdiccion,
           activo: true,
           verificado: rol === 'autoridad' ? false : true,
         },
@@ -63,55 +65,59 @@ export const existeUsuario = async (email) => {
 
 // Verificar login con rol
 export const verificarLogin = async (email, password) => {
-  try {
-    // Buscar usuario sin filtrar por activo primero para dar mensajes específicos
-    const { data, error } = await supabase
-      .from('usuarios')
-      .select('id, name, email, rol, activo, verificado, password_hash')
-      .eq('email', email)
-      .single();
+  return await safeAsyncCall(
+    async () => {
+      // Buscar usuario sin filtrar por activo primero para dar mensajes específicos
+      const { data, error } = await supabase
+        .from('usuarios')
+        .select('id, name, email, rol, activo, verificado, password_hash')
+        .eq('email', email)
+        .single();
 
-    if (error) {
-      return { success: false, error: 'Usuario o contraseña incorrectos' };
-    }
-
-    // Verificar contraseña primero
-    const hashedPassword = await hashPassword(password);
-    if (hashedPassword !== data.password_hash) {
-      return { success: false, error: 'Usuario o contraseña incorrectos' };
-    }
-
-    // Verificar si el usuario está activo
-    if (!data.activo) {
-      return { success: false, error: 'Tu cuenta ha sido desactivada. Contacta al administrador.' };
-    }
-
-    // Verificar si el usuario está verificado
-    if (!data.verificado) {
-      if (data.rol === 'autoridad') {
-        return { success: false, error: 'Su cuenta de autoridad está pendiente de verificación' };
-      } else {
-        return { success: false, error: 'Tu cuenta ha sido desactivada temporalmente. Contacta al administrador.' };
+      if (error) {
+        return { success: false, error: 'Usuario o contraseña incorrectos' };
       }
-    }
 
-    console.log(`✅ Login exitoso para ${email} (${data.rol})`);
-    
-
-    return { 
-      success: true, 
-      usuario: {
-        id: data.id,
-        name: data.name,
-        email: data.email,
-        rol: data.rol,
-        activo: data.activo,
-        verificado: data.verificado
+      // Verificar contraseña primero
+      const hashedPassword = await hashPassword(password);
+      if (hashedPassword !== data.password_hash) {
+        return { success: false, error: 'Usuario o contraseña incorrectos' };
       }
-    };
-  } catch (error) {
-    return { success: false, error: 'Error de conexión' };
-  }
+
+      // Verificar si el usuario está activo
+      if (!data.activo) {
+        return { success: false, error: 'Tu cuenta ha sido desactivada. Contacta al administrador.' };
+      }
+
+      // Verificar si el usuario está verificado
+      if (!data.verificado) {
+        if (data.rol === 'autoridad') {
+          return { success: false, error: 'Su cuenta de autoridad está pendiente de verificación' };
+        } else {
+          return { success: false, error: 'Tu cuenta ha sido desactivada temporalmente. Contacta al administrador.' };
+        }
+      }
+
+      console.log(`✅ Login exitoso para ${email} (${data.rol})`);
+      
+      return { 
+        success: true, 
+        usuario: {
+          id: data.id,
+          name: data.name,
+          email: data.email,
+          rol: data.rol,
+          activo: data.activo,
+          verificado: data.verificado
+        }
+      };
+    },
+    'Error al intentar iniciar sesión. Verifica tu conexión.',
+    (error) => {
+      reportError(error, 'verificarLogin');
+      return { success: false, error: 'Error de conexión al servidor' };
+    }
+  ) || { success: false, error: 'Error de conexión al servidor' };
 };
 
 // Enviar correo de recuperación de contraseña
@@ -952,7 +958,39 @@ export const obtenerReportesConContacto = async (usuarioId, rolUsuario, limite =
 
 export const obtenerReportesPorJurisdiccion = async (jurisdiccionAutoridad) => {
   try {
-    const { data, error } = await supabase
+    console.log('🔍 Obteniendo reportes para jurisdicción:', jurisdiccionAutoridad);
+
+    // Si la jurisdicción es 'Federal' o amplia, mostrar todos los reportes
+    if (jurisdiccionAutoridad === 'Federal' || jurisdiccionAutoridad === 'Zona Metropolitana de Guadalajara') {
+      const { data, error } = await supabase
+        .from('reportes')
+        .select(`
+          id,
+          nombre_desaparecido,
+          edad,
+          descripcion,
+          ultima_ubicacion,
+          ultima_fecha_visto,
+          estatus,
+          created_at,
+          usuario_id,
+          usuarios(name)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error obteniendo reportes (todos):', error);
+        return { success: false, error: error.message };
+      }
+
+      console.log(`✅ Se encontraron ${data?.length || 0} reportes totales`);
+      return { success: true, data: data };
+    }
+
+    // Para jurisdicciones específicas, intentar filtrado flexible
+    console.log('🔍 Intentando filtrado para jurisdicción específica:', jurisdiccionAutoridad);
+    
+    let { data, error } = await supabase
       .from('reportes')
       .select(`
         id,
@@ -960,22 +998,77 @@ export const obtenerReportesPorJurisdiccion = async (jurisdiccionAutoridad) => {
         edad,
         descripcion,
         ultima_ubicacion,
-        municipio,
         ultima_fecha_visto,
         estatus,
         created_at,
         usuario_id,
         usuarios(name)
       `)
-      .eq('municipio', jurisdiccionAutoridad)
+      .ilike('ultima_ubicacion', `%${jurisdiccionAutoridad}%`)
       .order('created_at', { ascending: false });
 
     if (error) {
+      console.error('Error obteniendo reportes por jurisdicción:', error);
       return { success: false, error: error.message };
     }
 
+    // Si no hay resultados con filtro exacto, intentar con palabra principal
+    if (!data || data.length === 0) {
+      console.log('⚠️ No hay resultados con filtro exacto, intentando con palabra principal...');
+      const palabraPrincipal = jurisdiccionAutoridad.split(' ')[0]; // Primera palabra
+      
+      ({ data, error } = await supabase
+        .from('reportes')
+        .select(`
+          id,
+          nombre_desaparecido,
+          edad,
+          descripcion,
+          ultima_ubicacion,
+          ultima_fecha_visto,
+          estatus,
+          created_at,
+          usuario_id,
+          usuarios(name)
+        `)
+        .ilike('ultima_ubicacion', `%${palabraPrincipal}%`)
+        .order('created_at', { ascending: false }));
+
+      if (error) {
+        console.error('Error con filtro de palabra principal:', error);
+        return { success: false, error: error.message };
+      }
+    }
+
+    // Si aún no hay resultados, mostrar todos los reportes
+    if (!data || data.length === 0) {
+      console.log('⚠️ No hay resultados específicos, mostrando todos los reportes...');
+      ({ data, error } = await supabase
+        .from('reportes')
+        .select(`
+          id,
+          nombre_desaparecido,
+          edad,
+          descripcion,
+          ultima_ubicacion,
+          ultima_fecha_visto,
+          estatus,
+          created_at,
+          usuario_id,
+          usuarios(name)
+        `)
+        .order('created_at', { ascending: false }));
+
+      if (error) {
+        console.error('Error obteniendo todos los reportes:', error);
+        return { success: false, error: error.message };
+      }
+    }
+
+    console.log(`✅ Se encontraron ${data?.length || 0} reportes para jurisdicción: ${jurisdiccionAutoridad}`);
     return { success: true, data: data };
   } catch (error) {
+    console.error('Error en obtenerReportesPorJurisdiccion:', error);
     return { success: false, error: error.message };
   }
 };
@@ -994,6 +1087,40 @@ export const obtenerInfoAutoridad = async (usuarioId) => {
 
     return { success: true, data: data };
   } catch (error) {
+    return { success: false, error: error.message };
+  }
+};
+
+// Función alternativa para obtener todos los reportes (sin filtro de jurisdicción)
+export const obtenerTodosLosReportes = async () => {
+  try {
+    console.log('🔍 Obteniendo todos los reportes...');
+    
+    const { data, error } = await supabase
+      .from('reportes')
+      .select(`
+        id,
+        nombre_desaparecido,
+        edad,
+        descripcion,
+        ultima_ubicacion,
+        ultima_fecha_visto,
+        estatus,
+        created_at,
+        usuario_id,
+        usuarios(name)
+      `)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error obteniendo todos los reportes:', error);
+      return { success: false, error: error.message };
+    }
+
+    console.log(`✅ Se encontraron ${data?.length || 0} reportes totales`);
+    return { success: true, data: data };
+  } catch (error) {
+    console.error('Error en obtenerTodosLosReportes:', error);
     return { success: false, error: error.message };
   }
 };

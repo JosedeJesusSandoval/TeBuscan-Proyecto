@@ -1,3 +1,4 @@
+import { Picker } from '@react-native-picker/picker';
 import React, { useEffect, useState } from 'react';
 import { Alert, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import {
@@ -11,6 +12,20 @@ import { validatePassword } from '../../utils/passwordValidation';
 // Importaciones específicas para activación/desactivación
 const { desactivarUsuario, activarUsuario } = require('../../DB/supabase');
 
+// Opciones de jurisdicción predefinidas - municipios y áreas de Jalisco
+const jurisdicciones = [
+  { label: 'Seleccionar jurisdicción...', value: '' },
+  { label: 'Guadalajara', value: 'Guadalajara' },
+  { label: 'Tlajomulco de Zúñiga', value: 'Tlajomulco de Zúñiga' },
+  { label: 'Zapopan', value: 'Zapopan' },
+  { label: 'Tonalá', value: 'Tonalá' },
+  { label: 'Tlaquepaque', value: 'Tlaquepaque' },
+  { label: 'El Salto', value: 'El Salto' },
+  { label: 'Zona Metropolitana de Guadalajara', value: 'Zona Metropolitana de Guadalajara' },
+  { label: 'Jalisco (Estatal)', value: 'Jalisco' },
+  { label: 'Federal', value: 'Federal' },
+];
+
 interface Usuario {
   id: number;
   name: string;
@@ -18,6 +33,7 @@ interface Usuario {
   rol: string;
   telefono?: string;
   institucion?: string;
+  jurisdiccion?: string;
   verificado?: boolean;
 }
 
@@ -33,7 +49,8 @@ export default function UsuariosScreen() {
     password?: string; 
     rol: string; 
     telefono?: string; 
-    institucion?: string; 
+    institucion?: string;
+    jurisdiccion?: string;
   }>({
     id: undefined,
     name: '', 
@@ -41,7 +58,8 @@ export default function UsuariosScreen() {
     password: '', 
     rol: '', 
     telefono: '', 
-    institucion: '' 
+    institucion: '',
+    jurisdiccion: ''
   });
   const [passwordValidation, setPasswordValidation] = useState({
     requirements: {
@@ -56,6 +74,19 @@ export default function UsuariosScreen() {
   });
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [selectedRole, setSelectedRole] = useState<string>('');
+  const [filtroUsuarios, setFiltroUsuarios] = useState<string>('todos'); // Nuevo estado para filtro
+  const [roleChangeModalVisible, setRoleChangeModalVisible] = useState(false); // Modal específico para cambio de rol
+  const [roleChangeData, setRoleChangeData] = useState<{
+    userId: number | null;
+    newRole: string;
+    institucion: string;
+    jurisdiccion: string;
+  }>({
+    userId: null,
+    newRole: '',
+    institucion: '',
+    jurisdiccion: ''
+  });
 
   useEffect(() => {
     fetchUsers();
@@ -71,7 +102,7 @@ export default function UsuariosScreen() {
   };
 
   const handleOpenModal = (rol: string) => {
-    setFormData({ name: '', email: '', password: '', rol, telefono: '', institucion: '' });
+    setFormData({ name: '', email: '', password: '', rol, telefono: '', institucion: '', jurisdiccion: '' });
     setPasswordValidation({
       requirements: {
         length: false,
@@ -90,6 +121,81 @@ export default function UsuariosScreen() {
     setModalVisible(false);
     setEditModalVisible(false);
     setRoleModalVisible(false);
+    setRoleChangeModalVisible(false);
+  };
+
+  // Función para filtrar usuarios
+  const usuariosFiltrados = users.filter(user => {
+    switch (filtroUsuarios) {
+      case 'ciudadanos':
+        return user.rol === 'ciudadano';
+      case 'autoridades':
+        return user.rol === 'autoridad';
+      case 'administradores':
+        return user.rol === 'admin';
+      case 'todos':
+      default:
+        return true;
+    }
+  });
+
+  // Función para manejar cambio de rol con validaciones
+  // Función para cambio directo de rol (sin datos adicionales)
+  const handleDirectRoleChange = async (userId: number, newRole: string) => {
+    try {
+      const { success, error } = await actualizarUsuario(userId, { rol: newRole });
+
+      if (success) {
+        Alert.alert('Éxito', 'Rol de usuario actualizado correctamente.');
+        fetchUsers();
+      } else {
+        Alert.alert('Error', `No se pudo actualizar el rol del usuario: ${error}`);
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Ocurrió un problema al actualizar el rol del usuario.');
+    }
+  };
+
+  // Función para cambio de rol a autoridad con datos adicionales
+  const handleAutorityRoleChange = async () => {
+    const { userId, newRole, institucion, jurisdiccion } = roleChangeData;
+
+    if (!userId) return;
+
+    // Validaciones
+    if (!institucion.trim()) {
+      Alert.alert('Error', 'La institución es obligatoria para usuarios de autoridad.');
+      return;
+    }
+
+    if (!jurisdiccion || jurisdiccion === '') {
+      Alert.alert('Error', 'Debe seleccionar una jurisdicción válida para usuarios de autoridad.');
+      return;
+    }
+
+    try {
+      const { success, error } = await actualizarUsuario(userId, { 
+        rol: newRole,
+        institucion: institucion.trim(),
+        jurisdiccion: jurisdiccion
+      });
+
+      if (success) {
+        Alert.alert('Éxito', 'Usuario actualizado a autoridad correctamente.');
+        fetchUsers();
+        setRoleChangeModalVisible(false);
+        setRoleChangeData({
+          userId: null,
+          newRole: '',
+          institucion: '',
+          jurisdiccion: ''
+        });
+      } else {
+        Alert.alert('Error', `No se pudo actualizar el usuario: ${error}`);
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Ocurrió un problema al actualizar el usuario.');
+    }
   };
 
   const handleInputChange = (field: string, value: string) => {
@@ -102,7 +208,7 @@ export default function UsuariosScreen() {
   };
 
   const handleSubmit = async () => {
-    const { name, email, password, rol, telefono, institucion } = formData;
+    const { name, email, password, rol, telefono, institucion, jurisdiccion } = formData;
 
     // Validaciones básicas
     if (!name.trim() || !email.trim() || !password) {
@@ -113,6 +219,12 @@ export default function UsuariosScreen() {
     // Validación específica para autoridades
     if (rol === 'autoridad' && !institucion?.trim()) {
       Alert.alert('Error', 'La institución es obligatoria para usuarios de autoridad.');
+      return;
+    }
+
+    // Validación de jurisdicción para autoridades
+    if (rol === 'autoridad' && (!jurisdiccion?.trim() || jurisdiccion === '')) {
+      Alert.alert('Error', 'Debe seleccionar una jurisdicción válida para usuarios de autoridad.');
       return;
     }
 
@@ -142,7 +254,8 @@ export default function UsuariosScreen() {
         hashedPassword, 
         rol, 
         telefono?.trim() || '', 
-        institucion?.trim() || ''
+        institucion?.trim() || '',
+        jurisdiccion?.trim() || ''
       );
 
       if (success) {
@@ -234,7 +347,7 @@ export default function UsuariosScreen() {
   };
 
   const handleEditSubmit = async () => {
-    const { id, name, email, password, telefono, institucion, rol } = formData;
+    const { id, name, email, password, telefono, institucion, jurisdiccion, rol } = formData;
 
     // Validar que usuarios autoridad tengan institución
     if (rol === 'autoridad' && !institucion?.trim()) {
@@ -242,9 +355,15 @@ export default function UsuariosScreen() {
       return;
     }
 
+    // Validar que usuarios autoridad tengan jurisdicción
+    if (rol === 'autoridad' && (!jurisdiccion?.trim() || jurisdiccion === '')) {
+      Alert.alert('Error', 'Debe seleccionar una jurisdicción válida para usuarios de autoridad.');
+      return;
+    }
+
     try {
       
-      const updatedData: any = { name, email, telefono, institucion };
+      const updatedData: any = { name, email, telefono, institucion, jurisdiccion };
 
       
       if (password) {
@@ -312,6 +431,19 @@ export default function UsuariosScreen() {
   const handleSaveRole = async () => {
     if (!selectedUserId) return;
 
+    // Si el rol seleccionado es autoridad, pedir datos adicionales
+    if (selectedRole === 'autoridad') {
+      setRoleModalVisible(false); // Cerrar modal de rol
+      setRoleChangeData({
+        userId: selectedUserId,
+        newRole: 'autoridad',
+        institucion: '',
+        jurisdiccion: ''
+      });
+      setRoleChangeModalVisible(true); // Abrir modal de autoridad
+      return;
+    }
+
     try {
       const { success, error } = await actualizarUsuario(selectedUserId, { rol: selectedRole });
 
@@ -342,9 +474,53 @@ export default function UsuariosScreen() {
           <Text style={styles.buttonText}>Crear Usuario Autoridad</Text>
         </TouchableOpacity>
 
+        {/* Filtros de usuarios */}
+        <View style={styles.filterSection}>
+          <Text style={styles.filterTitle}>Filtrar usuarios:</Text>
+          <View style={styles.filterButtonsContainer}>
+            <TouchableOpacity
+              style={[styles.filterButton, filtroUsuarios === 'todos' && styles.filterButtonActive]}
+              onPress={() => setFiltroUsuarios('todos')}
+            >
+              <Text style={[styles.filterButtonText, filtroUsuarios === 'todos' && styles.filterButtonTextActive]}>
+                Todos ({users.length})
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.filterButton, filtroUsuarios === 'ciudadanos' && styles.filterButtonActive]}
+              onPress={() => setFiltroUsuarios('ciudadanos')}
+            >
+              <Text style={[styles.filterButtonText, filtroUsuarios === 'ciudadanos' && styles.filterButtonTextActive]}>
+                Ciudadanos ({users.filter(u => u.rol === 'ciudadano').length})
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.filterButton, filtroUsuarios === 'autoridades' && styles.filterButtonActive]}
+              onPress={() => setFiltroUsuarios('autoridades')}
+            >
+              <Text style={[styles.filterButtonText, filtroUsuarios === 'autoridades' && styles.filterButtonTextActive]}>
+                Autoridades ({users.filter(u => u.rol === 'autoridad').length})
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.filterButton, filtroUsuarios === 'administradores' && styles.filterButtonActive]}
+              onPress={() => setFiltroUsuarios('administradores')}
+            >
+              <Text style={[styles.filterButtonText, filtroUsuarios === 'administradores' && styles.filterButtonTextActive]}>
+                Admins ({users.filter(u => u.rol === 'admin').length})
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* Lista de usuarios */}
-        <Text style={styles.sectionTitle}>Lista de Usuarios</Text>
-        {users.map((user) => (
+        <Text style={styles.sectionTitle}>
+          Lista de Usuarios {filtroUsuarios !== 'todos' && `- ${usuariosFiltrados.length} resultado(s)`}
+        </Text>
+        {usuariosFiltrados.map((user) => (
           <View key={user.id} style={styles.userCard}>
             <View>
               <View style={styles.userHeader}>
@@ -360,6 +536,12 @@ export default function UsuariosScreen() {
               </View>
               <Text style={styles.userEmail}>{user.email}</Text>
               <Text style={styles.userRole}>Rol: {user.rol}</Text>
+              {user.rol === 'autoridad' && user.institucion && (
+                <Text style={styles.userInfo}>Institución: {user.institucion}</Text>
+              )}
+              {user.rol === 'autoridad' && user.jurisdiccion && (
+                <Text style={styles.userInfo}>Jurisdicción: {user.jurisdiccion}</Text>
+              )}
               {!user.verificado && (
                 <Text style={styles.warningText}>
                   ⚠️ Este usuario no puede iniciar sesión
@@ -456,12 +638,35 @@ export default function UsuariosScreen() {
             />
 
             {formData.rol === 'autoridad' && (
-              <TextInput
-                style={styles.input}
-                placeholder="Institución"
-                value={formData.institucion}
-                onChangeText={(value) => handleInputChange('institucion', value)}
-              />
+              <>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Institución"
+                  value={formData.institucion}
+                  onChangeText={(value) => handleInputChange('institucion', value)}
+                />
+                
+                {/* Selector de Jurisdicción */}
+                <View style={styles.selectorContainer}>
+                  <Text style={styles.selectorLabel}>Jurisdicción *</Text>
+                  <View style={styles.pickerContainer}>
+                    <Picker
+                      selectedValue={formData.jurisdiccion}
+                      onValueChange={(value) => handleInputChange('jurisdiccion', value)}
+                      style={styles.picker}
+                    >
+                      {jurisdicciones.map((item, index) => (
+                        <Picker.Item
+                          key={index}
+                          label={item.label}
+                          value={item.value}
+                          enabled={item.value !== ''}
+                        />
+                      ))}
+                    </Picker>
+                  </View>
+                </View>
+              </>
             )}
 
             <View style={styles.modalButtons}>
@@ -546,6 +751,30 @@ export default function UsuariosScreen() {
               value={formData.institucion}
               onChangeText={(value) => handleInputChange('institucion', value)}
             />
+            {formData.rol === 'autoridad' && (
+              <>
+                {/* Selector de Jurisdicción */}
+                <View style={styles.selectorContainer}>
+                  <Text style={styles.selectorLabel}>Jurisdicción *</Text>
+                  <View style={styles.pickerContainer}>
+                    <Picker
+                      selectedValue={formData.jurisdiccion}
+                      onValueChange={(value) => handleInputChange('jurisdiccion', value)}
+                      style={styles.picker}
+                    >
+                      {jurisdicciones.map((item, index) => (
+                        <Picker.Item
+                          key={index}
+                          label={item.label}
+                          value={item.value}
+                          enabled={item.value !== ''}
+                        />
+                      ))}
+                    </Picker>
+                  </View>
+                </View>
+              </>
+            )}
 
             <View style={styles.modalButtons}>
               <TouchableOpacity
@@ -609,6 +838,70 @@ export default function UsuariosScreen() {
               <TouchableOpacity
                 style={[styles.button, styles.cancelButton]}
                 onPress={() => setRoleModalVisible(false)}
+              >
+                <Text style={styles.buttonText}>Cancelar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal para datos de autoridad */}
+      <Modal visible={roleChangeModalVisible} animationType="slide" transparent={true}>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Datos de Autoridad</Text>
+            
+            <Text style={styles.label}>Institución:</Text>
+            <TextInput
+              style={styles.input}
+              value={roleChangeData.institucion}
+              onChangeText={(text) => setRoleChangeData({
+                ...roleChangeData,
+                institucion: text
+              })}
+              placeholder="Nombre de la institución"
+            />
+
+            <Text style={styles.label}>Jurisdicción:</Text>
+            <View style={styles.pickerContainer}>
+              <Picker
+                selectedValue={roleChangeData.jurisdiccion}
+                onValueChange={(value: string) => setRoleChangeData({
+                  ...roleChangeData,
+                  jurisdiccion: value
+                })}
+                style={styles.picker}
+              >
+                <Picker.Item label="Selecciona jurisdicción" value="" />
+                {jurisdicciones.map((item, index) => (
+                  <Picker.Item 
+                    key={index} 
+                    label={item.label} 
+                    value={item.value} 
+                  />
+                ))}
+              </Picker>
+            </View>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.button, styles.submitButton]}
+                onPress={handleAutorityRoleChange}
+              >
+                <Text style={styles.buttonText}>Confirmar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.button, styles.cancelButton]}
+                onPress={() => {
+                  setRoleChangeModalVisible(false);
+                  setRoleChangeData({
+                    userId: null,
+                    newRole: '',
+                    institucion: '',
+                    jurisdiccion: ''
+                  });
+                }}
               >
                 <Text style={styles.buttonText}>Cancelar</Text>
               </TouchableOpacity>
@@ -741,6 +1034,11 @@ const styles = StyleSheet.create({
     color: '#2980b9',
     marginBottom: 5,
   },
+  userInfo: {
+    fontSize: 13,
+    color: '#7f8c8d',
+    marginBottom: 3,
+  },
   statusBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -806,6 +1104,113 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#2c3e50',
     fontWeight: '600',
+  },
+  selectorContainer: {
+    marginBottom: 15,
+  },
+  selectorLabel: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    marginBottom: 8,
+  },
+  jurisdiccionButtons: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  jurisdiccionButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#bdc3c7',
+    backgroundColor: '#f8f9fa',
+    marginBottom: 5,
+  },
+  jurisdiccionButtonSelected: {
+    backgroundColor: '#3498db',
+    borderColor: '#2980b9',
+  },
+  jurisdiccionButtonText: {
+    fontSize: 12,
+    color: '#7f8c8d',
+    fontWeight: '500',
+  },
+  jurisdiccionButtonTextSelected: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  helperText: {
+    fontSize: 12,
+    color: '#7f8c8d',
+    fontStyle: 'italic',
+    marginTop: -10,
+    marginBottom: 10,
+  },
+  pickerContainer: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 5,
+    backgroundColor: '#fff',
+    marginBottom: 15,
+  },
+  picker: {
+    height: 50,
+    backgroundColor: 'transparent',
+  },
+  // Estilos para filtros
+  filterSection: {
+    backgroundColor: '#fff',
+    padding: 15,
+    marginBottom: 15,
+    borderRadius: 10,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  filterTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    marginBottom: 10,
+  },
+  filterButtonsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  filterButton: {
+    backgroundColor: '#ecf0f1',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#bdc3c7',
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  filterButtonActive: {
+    backgroundColor: '#3498db',
+    borderColor: '#2980b9',
+  },
+  filterButtonText: {
+    fontSize: 12,
+    color: '#7f8c8d',
+    fontWeight: '500',
+  },
+  filterButtonTextActive: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2c3e50',
+    marginBottom: 5,
+    marginTop: 10,
   },
 });
 

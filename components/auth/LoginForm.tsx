@@ -72,7 +72,7 @@ const LoginForm = () => {
   };
 
   const handleRegister = () => {
-    router.push('/(auth)/registro');
+    router.push('/(auth)/registro-tipo');
   };
 
   const handleForgotPassword = () => {

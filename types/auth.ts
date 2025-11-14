@@ -5,6 +5,7 @@ export interface Usuario {
   rol: 'ciudadano' | 'autoridad' | 'admin';
   activo: boolean;
   verificado: boolean;
+  jurisdiccion?: string;
 }
 
 export interface LoginResponse {
@@ -20,4 +21,5 @@ export interface RegisterData {
   rol?: 'ciudadano' | 'autoridad' | 'admin';
   telefono?: string;
   institucion?: string;
+  jurisdiccion?: string;
 }

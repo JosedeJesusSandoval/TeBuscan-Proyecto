@@ -319,7 +319,7 @@ export default function ReportarScreen() {
       <Text style={styles.fieldLabel}>Última ubicación donde fue vista la persona:</Text>
       <TextInput
         style={[styles.input, styles.multilineInput]}
-        placeholder="Ej: Parque Central, Centro de Monterrey, NL - Cerca de la fuente principal *"
+        placeholder="Ej: Parque Central, Centro de Guadalajara, Jalisco - Cerca de la fuente principal *"
         value={ubicacion}
         onChangeText={setUbicacion}
         multiline
