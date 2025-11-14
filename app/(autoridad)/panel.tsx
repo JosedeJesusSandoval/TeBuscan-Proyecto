@@ -300,37 +300,7 @@ export default function AutoridadPanel() {
               </View>
             )}
 
-            {/* Sistema de Inteligencia Artificial */}
-            <View style={styles.aiSection}>
-              <View style={styles.aiHeader}>
-                <Text style={styles.aiTitle}>🤖 Sistema IA - TeBuscan</Text>
-                <View style={styles.aiStatus}>
-                  <View style={styles.statusDot}></View>
-                  <Text style={styles.aiStatusText}>Operativo</Text>
-                </View>
-              </View>
-              
-              <View style={styles.aiGrid}>
-                <View style={styles.enhancedAiCard}>
-                  <Text style={styles.aiCardIcon}>🎯</Text>
-                  <Text style={styles.aiLabel}>Clasificación</Text>
-                  <Text style={styles.aiValue}>Activa</Text>
-                  <Text style={styles.aiProgress}>98% precisión</Text>
-                </View>
-                <View style={styles.enhancedAiCard}>
-                  <Text style={styles.aiCardIcon}>📊</Text>
-                  <Text style={styles.aiLabel}>Patrones</Text>
-                  <Text style={styles.aiValue}>Analizando</Text>
-                  <Text style={styles.aiProgress}>{Math.floor(Math.random() * 20) + 15} detectados</Text>
-                </View>
-                <View style={styles.enhancedAiCard}>
-                  <Text style={styles.aiCardIcon}>🔔</Text>
-                  <Text style={styles.aiLabel}>Notificaciones</Text>
-                  <Text style={styles.aiValue}>{estadisticas.urgentes + estadisticas.criticos}</Text>
-                  <Text style={styles.aiProgress}>Tiempo real</Text>
-                </View>
-              </View>
-            </View>
+
           </>
         )}
 
@@ -354,26 +324,7 @@ export default function AutoridadPanel() {
           </TouchableOpacity>
         </View>
 
-        {/* Botón de notificaciones para usuarios cercanos */}
-        {(estadisticas.criticos > 0 || estadisticas.urgentes > 0) && (
-          <TouchableOpacity 
-            style={styles.notificationButton}
-            onPress={() => Alert.alert(
-              'Notificaciones', 
-              `Se enviarán alertas a usuarios cercanos en ${jurisdiccion} sobre ${estadisticas.criticos + estadisticas.urgentes} casos prioritarios.`,
-              [
-                { text: 'Cancelar', style: 'cancel' },
-                { text: 'Enviar', onPress: () => Alert.alert('✅ Enviado', 'Notificaciones enviadas a la comunidad') }
-              ]
-            )}
-          >
-            <Text style={styles.notificationIcon}>📢</Text>
-            <Text style={styles.notificationText}>Notificar a Comunidad</Text>
-            <Text style={styles.notificationSubtext}>
-              Alertar a usuarios cercanos sobre casos prioritarios
-            </Text>
-          </TouchableOpacity>
-        )}
+
 
         {/* Botón de cerrar sesión */}
         <View style={styles.logoutSection}>
@@ -825,95 +776,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-  aiSection: {
-    backgroundColor: 'white',
-    borderRadius: 15,
-    padding: 20,
-    marginBottom: 25,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    borderWidth: 1,
-    borderColor: '#e3f2fd',
-  },
-  aiHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  aiStatus: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#4caf50',
-    marginRight: 5,
-  },
-  aiStatusText: {
-    fontSize: 12,
-    color: '#4caf50',
-    fontWeight: '600',
-  },
-  aiTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2c3e50',
-    marginBottom: 15,
-    textAlign: 'center',
-  },
-  aiGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  aiCard: {
-    backgroundColor: '#f8f9fa',
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-    flex: 1,
-    marginHorizontal: 5,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  aiLabel: {
-    fontSize: 12,
-    color: '#6c757d',
-    marginBottom: 5,
-    textAlign: 'center',
-  },
-  aiValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#2196F3',
-    textAlign: 'center',
-  },
-  enhancedAiCard: {
-    backgroundColor: '#f8f9fa',
-    padding: 15,
-    borderRadius: 12,
-    alignItems: 'center',
-    flex: 1,
-    marginHorizontal: 3,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-    elevation: 1,
-  },
-  aiCardIcon: {
-    fontSize: 20,
-    marginBottom: 8,
-  },
-  aiProgress: {
-    fontSize: 10,
-    color: '#6c757d',
-    marginTop: 2,
-    textAlign: 'center',
-  },
+  // Estilos removidos - funcionalidad de notificaciones eliminada
   // Nuevos estilos de botones
   actionGrid: {
     flexDirection: 'row',
@@ -957,36 +820,7 @@ const styles = StyleSheet.create({
     color: '#7f8c8d',
     textAlign: 'center',
   },
-  // Botón de notificaciones
-  notificationButton: {
-    backgroundColor: '#fff3e0',
-    borderColor: '#ff9800',
-    borderWidth: 2,
-    borderRadius: 15,
-    padding: 20,
-    alignItems: 'center',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-  },
-  notificationIcon: {
-    fontSize: 28,
-    marginBottom: 8,
-  },
-  notificationText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#e65100',
-    marginBottom: 5,
-  },
-  notificationSubtext: {
-    fontSize: 12,
-    color: '#bf360c',
-    textAlign: 'center',
-    fontStyle: 'italic',
-  },
+
   // ============ ESTILOS DEL BOTÓN DE LOGOUT ============
   logoutSection: {
     marginTop: 25,

@@ -1,14 +1,14 @@
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    RefreshControl,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { actualizarReporte, obtenerInfoAutoridad, obtenerReportesPorJurisdiccion } from '../../DB/supabase';
 import { useAuth } from '../../context/AuthContext';
@@ -31,10 +31,17 @@ export default function CasosScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [jurisdiccion, setJurisdiccion] = useState<string>('');
   const [autoridad, setAutoridad] = useState<any>(null);
+  const [filtroEstado, setFiltroEstado] = useState<'todos' | 'desaparecidos' | 'encontrados'>('desaparecidos');
+  const [reportesFiltrados, setReportesFiltrados] = useState<Reporte[]>([]);
 
   useEffect(() => {
     inicializarDatos();
   }, []);
+
+  // Efecto para aplicar filtros cuando cambien los reportes
+  useEffect(() => {
+    aplicarFiltroEstado(reportes, filtroEstado);
+  }, [reportes, filtroEstado]);
 
   const inicializarDatos = async () => {
     if (!user?.id) {
@@ -113,6 +120,8 @@ export default function CasosScreen() {
       });
 
       setReportes(reportesConPrioridad);
+      // Aplicar filtro después de cargar los reportes
+      aplicarFiltroEstado(reportesConPrioridad, filtroEstado);
     } catch (error) {
       console.error('❌ Error cargando reportes:', error);
       Alert.alert('Error', 'Problema al cargar los reportes: ' + (error instanceof Error ? error.message : String(error)));
@@ -125,6 +134,30 @@ export default function CasosScreen() {
   const onRefresh = () => {
     setRefreshing(true);
     cargarReportes();
+  };
+
+  const aplicarFiltroEstado = (reportesList: Reporte[], filtro: 'todos' | 'desaparecidos' | 'encontrados') => {
+    let filtrados: Reporte[];
+    
+    switch (filtro) {
+      case 'desaparecidos':
+        filtrados = reportesList.filter(reporte => reporte.estatus === 'desaparecido');
+        break;
+      case 'encontrados':
+        filtrados = reportesList.filter(reporte => reporte.estatus === 'encontrado');
+        break;
+      case 'todos':
+      default:
+        filtrados = reportesList;
+        break;
+    }
+    
+    setReportesFiltrados(filtrados);
+  };
+
+  const cambiarFiltro = (nuevoFiltro: 'todos' | 'desaparecidos' | 'encontrados') => {
+    setFiltroEstado(nuevoFiltro);
+    aplicarFiltroEstado(reportes, nuevoFiltro);
   };
 
   const cambiarEstatus = async (reporteId: string, nuevoEstatus: string) => {
@@ -219,11 +252,53 @@ export default function CasosScreen() {
 
   return (
     <View style={styles.container}>
+      {/* Header con filtros */}
+      <View style={styles.filterHeader}>
+        <Text style={styles.filterTitle}>📊 Gestión de Casos</Text>
+        <View style={styles.filterButtons}>
+          <TouchableOpacity
+            style={[styles.filterButton, filtroEstado === 'todos' && styles.filterButtonActive]}
+            onPress={() => cambiarFiltro('todos')}
+          >
+            <Text style={[styles.filterButtonText, filtroEstado === 'todos' && styles.filterButtonTextActive]}>
+              Todos
+            </Text>
+            <Text style={[styles.filterButtonCount, filtroEstado === 'todos' && styles.filterButtonCountActive]}>
+              {reportes.length}
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[styles.filterButton, filtroEstado === 'desaparecidos' && styles.filterButtonActive]}
+            onPress={() => cambiarFiltro('desaparecidos')}
+          >
+            <Text style={[styles.filterButtonText, filtroEstado === 'desaparecidos' && styles.filterButtonTextActive]}>
+              Desaparecidos
+            </Text>
+            <Text style={[styles.filterButtonCount, filtroEstado === 'desaparecidos' && styles.filterButtonCountActive]}>
+              {reportes.filter(r => r.estatus === 'desaparecido').length}
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[styles.filterButton, filtroEstado === 'encontrados' && styles.filterButtonActive]}
+            onPress={() => cambiarFiltro('encontrados')}
+          >
+            <Text style={[styles.filterButtonText, filtroEstado === 'encontrados' && styles.filterButtonTextActive]}>
+              Encontrados
+            </Text>
+            <Text style={[styles.filterButtonCount, filtroEstado === 'encontrados' && styles.filterButtonCountActive]}>
+              {reportes.filter(r => r.estatus === 'encontrado').length}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
       {loading ? (
         <ActivityIndicator size="large" color="#e74c3c" style={styles.loading} />
       ) : (
         <FlatList
-          data={reportes}
+          data={reportesFiltrados}
           renderItem={renderReporte}
           keyExtractor={(item) => item.id.toString()}
           contentContainerStyle={styles.listContainer}
@@ -237,11 +312,15 @@ export default function CasosScreen() {
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyIcon}>🔍</Text>
-              <Text style={styles.emptyText}>No hay casos registrados</Text>
+              <Text style={styles.emptyText}>
+                {filtroEstado === 'todos' ? 'No hay casos registrados' :
+                 filtroEstado === 'desaparecidos' ? 'No hay casos de desaparecidos' :
+                 'No hay casos de personas encontradas'}
+              </Text>
               <Text style={styles.emptySubtext}>
                 {jurisdiccion 
-                  ? `No se encontraron reportes para la jurisdicción: ${jurisdiccion}`
-                  : 'No se encontraron reportes en el sistema'
+                  ? `No se encontraron reportes con estatus "${filtroEstado}" para la jurisdicción: ${jurisdiccion}`
+                  : `No se encontraron reportes con estatus "${filtroEstado}" en el sistema`
                 }
               </Text>
               <TouchableOpacity 
@@ -372,6 +451,76 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f7fa',
+  },
+  // ============ ESTILOS DE FILTROS ============
+  filterHeader: {
+    backgroundColor: 'white',
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    paddingTop: 50,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e9ecef',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  filterTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  filterButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  filterButton: {
+    flex: 1,
+    backgroundColor: '#f8f9fa',
+    borderWidth: 2,
+    borderColor: '#e9ecef',
+    borderRadius: 25,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  filterButtonActive: {
+    backgroundColor: '#e74c3c',
+    borderColor: '#e74c3c',
+    elevation: 3,
+    shadowColor: '#e74c3c',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+  },
+  filterButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6c757d',
+    textAlign: 'center',
+    marginBottom: 2,
+  },
+  filterButtonTextActive: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  filterButtonCount: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#e74c3c',
+    textAlign: 'center',
+  },
+  filterButtonCountActive: {
+    color: 'white',
   },
   // ============ ESTILOS DEL HEADER MODERNO ============
   modernHeader: {
