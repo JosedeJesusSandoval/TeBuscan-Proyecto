@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { existeUsuario, insertarUsuario } from '../../DB/supabase';
+import { existeUsuario, insertarUsuarioSimple } from '../../DB/supabase';
 import { hashPassword } from '../../utils/crypto';
 import { getErrorMessage } from '../../utils/errors';
 import Button from '../common/Button';
@@ -99,18 +99,13 @@ const RegisterForm = () => {
       // Combinar nombre y apellido para el campo nombre completo
       const nombreCompleto = `${firstName.trim()} ${lastName.trim()}`;
       
-      // Insertar usuario con rol 'ciudadano' por defecto
-      const resultado = await insertarUsuario(
-        nombreCompleto,
-        email.trim(),
-        password_hash,
-        'ciudadano'
-      );
+      // Insertar usuario sin verificación por email
+      const resultado = await insertarUsuarioSimple(nombreCompleto, email.trim(), password_hash, 'ciudadano');
 
       if (resultado.success) {
         Alert.alert(
           '¡Registro exitoso! 🎉', 
-          `¡Bienvenido ${firstName}! Con tu ayuda podremos encontrarlos.`,
+          resultado.message || `¡Bienvenido ${firstName}! Con tu ayuda podremos encontrarlos.`,
           [
             {
               text: 'Ir a Login',

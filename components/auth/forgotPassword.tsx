@@ -12,7 +12,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { crearUsuarioAuth, diagnosticarConfiguracion, enviarRecuperacionContrasena } from '../../DB/supabase';
+import { crearUsuarioAuth, diagnosticarConfiguracion, enviarRecuperacionContrasena, sincronizarUsuariosAuth } from '../../DB/supabase';
 
 interface ForgotPasswordProps {
   onBackToLogin: () => void;
@@ -208,6 +208,30 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onBackToLogin })
             >
               <Text style={styles.debugButtonText}>
                 Crear Usuario de Prueba en Supabase Auth
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[styles.debugButton, { backgroundColor: '#28a745' }]}
+              onPress={async () => {
+                setLoading(true);
+                const resultado = await sincronizarUsuariosAuth();
+                setLoading(false);
+                
+                if (resultado.success) {
+                  Alert.alert(
+                    '✅ Sincronización Completada',
+                    `Se sincronizaron ${resultado.data.sincronizados} usuarios de ${resultado.data.total} totales.\nErrores: ${resultado.data.errores}`,
+                    [{ text: 'OK' }]
+                  );
+                } else {
+                  Alert.alert('Error', resultado.error);
+                }
+              }}
+              disabled={loading}
+            >
+              <Text style={styles.debugButtonText}>
+                🔄 Sincronizar Todos los Usuarios con Auth
               </Text>
             </TouchableOpacity>
           </View>

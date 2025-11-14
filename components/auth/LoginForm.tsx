@@ -4,14 +4,12 @@ import { ActivityIndicator, Alert, StyleSheet, Text, TextInput, TouchableOpacity
 import { useAuth } from '../../context/AuthContext';
 import { verificarLogin } from '../../DB/supabase';
 import Button from '../common/Button';
-import { ForgotPassword } from './forgotPassword';
 
 
 const LoginForm = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showForgotPassword, setShowForgotPassword] = useState(false);
 
   const { setUser } = useAuth();
   
@@ -75,18 +73,6 @@ const LoginForm = () => {
     router.push('/(auth)/registro-tipo');
   };
 
-  const handleForgotPassword = () => {
-    setShowForgotPassword(true);
-  };
-
-  const handleBackToLogin = () => {
-    setShowForgotPassword(false);
-  };
-
-  if (showForgotPassword) {
-    return <ForgotPassword onBackToLogin={handleBackToLogin} />;
-  }
-
   if (loading) {
     return (
       <View style={[styles.container, styles.loadingContainer]}>
@@ -124,10 +110,6 @@ const LoginForm = () => {
       <View style={styles.buttonContainer}>
         <TouchableOpacity onPress={handleRegister} style={styles.linkButton}>
           <Text style={styles.linkText}>¿No tienes cuenta? Regístrate</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={handleForgotPassword} style={styles.linkButton}>
-          <Text style={styles.linkText}>¿Olvidaste tu contraseña?</Text>
         </TouchableOpacity>
       </View>
     </View>

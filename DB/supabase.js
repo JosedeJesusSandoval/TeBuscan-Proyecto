@@ -10,39 +10,53 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // ============ FUNCIONES DE USUARIOS ============
 
-// Insertar usuario con rol
-export const insertarUsuario = async (name, email, password_hash, rol = 'ciudadano', telefono = '', institucion = '', jurisdiccion = '') => {
+// Versión simplificada para desarrollo (sin email verification)
+export const insertarUsuarioSimple = async (name, email, password_hash, rol = 'ciudadano', telefono = '', institucion = '', jurisdiccion = '') => {
   try {
-    console.log('Datos enviados a Supabase:', { name, email, password_hash, rol, telefono, institucion, jurisdiccion });
+    console.log('📝 Registrando usuario simple:', { name, email, rol });
+
+    // Verificar si ya existe
+    const usuarioExiste = await existeUsuario(email);
+    if (usuarioExiste) {
+      return { success: false, error: 'Ya existe una cuenta con este correo electrónico' };
+    }
+
+    // Insertar directamente en tabla personalizada
+    const userData = {
+      name,
+      email,
+      password_hash,
+      rol,
+      telefono: telefono || null,
+      institucion: institucion || null,
+      jurisdiccion: rol === 'ciudadano' ? null : (jurisdiccion || null),
+      activo: true,
+      verificado: true, // Para desarrollo, marcar como verificado directamente
+    };
 
     const { data, error } = await supabase
       .from('usuarios')
-      .insert([
-        {
-          name,
-          email,
-          password_hash,
-          rol,
-          telefono,
-          institucion,
-          jurisdiccion,
-          activo: true,
-          verificado: rol === 'autoridad' ? false : true,
-        },
-      ])
+      .insert([userData])
       .select();
 
     if (error) {
-      console.error('Error al insertar usuario:', error);
+      console.error('❌ Error al insertar usuario:', error);
       return { success: false, error: error.message };
     }
 
-    return { success: true, data: data[0] };
+    console.log('✅ Usuario registrado exitosamente (modo simple)');
+    return { 
+      success: true, 
+      data: data[0],
+      message: 'Usuario registrado exitosamente. Puedes iniciar sesión ahora.'
+    };
   } catch (error) {
-    console.error('Error en insertarUsuario:', error);
+    console.error('📊 Error en insertarUsuarioSimple:', error);
     return { success: false, error: error.message };
   }
 };
+
+// Insertar usuario sin verificación por email
 
 // Verificar si existe usuario
 export const existeUsuario = async (email) => {
@@ -62,6 +76,8 @@ export const existeUsuario = async (email) => {
     return false;
   }
 };
+
+// ============ FIN DE FUNCIONES DE USUARIOS ============
 
 // Verificar login con rol
 export const verificarLogin = async (email, password) => {
@@ -92,9 +108,18 @@ export const verificarLogin = async (email, password) => {
       // Verificar si el usuario está verificado
       if (!data.verificado) {
         if (data.rol === 'autoridad') {
-          return { success: false, error: 'Su cuenta de autoridad está pendiente de verificación' };
+          return { 
+            success: false, 
+            error: 'Su cuenta de autoridad está pendiente de verificación por el administrador',
+            requiresAdminVerification: true 
+          };
         } else {
-          return { success: false, error: 'Tu cuenta ha sido desactivada temporalmente. Contacta al administrador.' };
+          return { 
+            success: false, 
+            error: 'Debes confirmar tu email antes de iniciar sesión. Revisa tu bandeja de entrada.',
+            requiresEmailConfirmation: true,
+            email: email
+          };
         }
       }
 
@@ -120,53 +145,7 @@ export const verificarLogin = async (email, password) => {
   ) || { success: false, error: 'Error de conexión al servidor' };
 };
 
-// Enviar correo de recuperación de contraseña
-export const enviarRecuperacionContrasena = async (email) => {
-  try {
-    console.log('🔍 Iniciando recuperación de contraseña para:', email);
-    
-    // Primero verificar que el email existe en nuestra base de datos
-    const usuarioExiste = await existeUsuario(email);
-    console.log('👤 Usuario existe en BD:', usuarioExiste);
-    
-    if (!usuarioExiste) {
-      console.log('❌ Usuario no encontrado en la base de datos');
-      return { success: false, error: 'No existe una cuenta con este correo electrónico' };
-    }
 
-    console.log('📧 Intentando enviar correo de recuperación...');
-    
-    // Configuración mejorada para el resetPasswordForEmail
-    const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: 'https://localhostlocalhost:8081/reset-password', // URL temporal para desarrollo
-    });
-
-    console.log('📨 Respuesta de Supabase:', { data, error });
-
-    if (error) {
-      console.error('❌ Error detallado de Supabase:', {
-        message: error.message,
-        status: error.status,
-        details: error
-      });
-      
-      // Mensajes de error más específicos
-      if (error.message?.includes('email not confirmed')) {
-        return { success: false, error: 'El correo electrónico no ha sido confirmado' };
-      } else if (error.message?.includes('email not found')) {
-        return { success: false, error: 'No existe una cuenta con este correo electrónico' };
-      } else {
-        return { success: false, error: `Error: ${error.message}` };
-      }
-    }
-
-    console.log('✅ Correo de recuperación enviado exitosamente');
-    return { success: true, message: 'Se ha enviado un correo de recuperación a tu email' };
-  } catch (error) {
-    console.error('💥 Error inesperado en enviarRecuperacionContrasena:', error);
-    return { success: false, error: 'Error de conexión' };
-  }
-};
 
 // Función de diagnóstico para verificar configuración
 export const diagnosticarConfiguracion = async () => {
@@ -230,6 +209,63 @@ export const crearUsuarioAuth = async (email, password) => {
     return { success: true, data };
   } catch (error) {
     console.error('Error en crearUsuarioAuth:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Sincronizar usuarios existentes con Supabase Auth
+export const sincronizarUsuariosAuth = async () => {
+  try {
+    console.log('🔄 Sincronizando usuarios con Supabase Auth...');
+    
+    // Obtener todos los usuarios de la tabla personalizada
+    const { data: usuarios, error } = await supabase
+      .from('usuarios')
+      .select('email');
+
+    if (error) {
+      console.error('Error obteniendo usuarios:', error);
+      return { success: false, error: error.message };
+    }
+
+    let sincronizados = 0;
+    let errores = 0;
+
+    for (const usuario of usuarios) {
+      try {
+        // Intentar crear cada usuario en Supabase Auth
+        const { error: authError } = await supabase.auth.signUp({
+          email: usuario.email,
+          password: 'TempPassword123!', // Contraseña temporal
+        });
+
+        if (authError && !authError.message.includes('already registered')) {
+          console.error(`Error sincronizando ${usuario.email}:`, authError);
+          errores++;
+        } else {
+          console.log(`✅ Usuario sincronizado: ${usuario.email}`);
+          sincronizados++;
+        }
+
+        // Pequeña pausa para no saturar la API
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } catch (error) {
+        console.error(`Error procesando ${usuario.email}:`, error);
+        errores++;
+      }
+    }
+
+    console.log(`📊 Sincronización completada: ${sincronizados} exitosos, ${errores} errores`);
+    return { 
+      success: true, 
+      data: { 
+        sincronizados, 
+        errores, 
+        total: usuarios.length 
+      } 
+    };
+  } catch (error) {
+    console.error('Error en sincronización:', error);
     return { success: false, error: error.message };
   }
 };
