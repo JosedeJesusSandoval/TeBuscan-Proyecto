@@ -2,17 +2,15 @@ import { Picker } from '@react-native-picker/picker';
 import React, { useEffect, useState } from 'react';
 import { Alert, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import {
-    actualizarUsuario,
-    insertarUsuario,
-    obtenerUsuarios
+  actualizarUsuario,
+  insertarUsuarioSimple,
+  obtenerUsuarios
 } from '../../DB/supabase';
 import { hashPassword } from '../../utils/crypto';
 import { validatePassword } from '../../utils/passwordValidation';
 
-// Importaciones específicas para activación/desactivación
 const { desactivarUsuario, activarUsuario } = require('../../DB/supabase');
 
-// Opciones de jurisdicción predefinidas - municipios y áreas de Jalisco
 const jurisdicciones = [
   { label: 'Seleccionar jurisdicción...', value: '' },
   { label: 'Guadalajara', value: 'Guadalajara' },
@@ -74,8 +72,8 @@ export default function UsuariosScreen() {
   });
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [selectedRole, setSelectedRole] = useState<string>('');
-  const [filtroUsuarios, setFiltroUsuarios] = useState<string>('todos'); // Nuevo estado para filtro
-  const [roleChangeModalVisible, setRoleChangeModalVisible] = useState(false); // Modal específico para cambio de rol
+  const [filtroUsuarios, setFiltroUsuarios] = useState<string>('todos');
+  const [roleChangeModalVisible, setRoleChangeModalVisible] = useState(false);
   const [roleChangeData, setRoleChangeData] = useState<{
     userId: number | null;
     newRole: string;
@@ -245,10 +243,8 @@ export default function UsuariosScreen() {
     }
 
     try {
-      console.log(`🔄 Creando usuario ${rol}: ${email}`);
-      
       const hashedPassword = await hashPassword(password);
-      const { success, error } = await insertarUsuario(
+      const { success, error } = await insertarUsuarioSimple(
         name.trim(), 
         email.trim().toLowerCase(), 
         hashedPassword, 
@@ -269,15 +265,12 @@ export default function UsuariosScreen() {
           `${roleText} creado: ${email}\n\n${statusText}`
         );
         
-        console.log(`✅ Usuario ${rol} creado exitosamente: ${email}`);
         fetchUsers();
         handleCloseModal();
       } else {
-        console.error(`❌ Error creando usuario ${rol}:`, error);
         Alert.alert('Error al Crear Usuario', error || 'No se pudo crear el usuario.');
       }
     } catch (error) {
-      console.error('❌ Error en handleSubmit:', error);
       Alert.alert('Error', 'Ocurrió un problema inesperado. Intenta nuevamente.');
     }
   };

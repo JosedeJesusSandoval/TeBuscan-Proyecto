@@ -68,7 +68,6 @@ export default function ReportarScreen() {
         setFoto(result.assets[0].uri);
       }
     } catch (error) {
-      console.error('Error al seleccionar imagen:', error);
       Alert.alert('Error', 'No se pudo seleccionar la imagen');
     }
   };
@@ -109,7 +108,6 @@ export default function ReportarScreen() {
         );
       }
     } catch (error) {
-      console.error('Error al buscar ubicación:', error);
       Alert.alert(
         'Error de búsqueda', 
         'No se pudo buscar la ubicación. Verifica tu conexión a internet e intenta nuevamente.',
@@ -216,7 +214,6 @@ export default function ReportarScreen() {
         setFolio(null);
       }
     } catch (error) {
-      console.error('Error al enviar reporte:', error);
       Alert.alert('Error', 'Ocurrió un error inesperado al enviar el reporte');
       setFolio(null);
     }

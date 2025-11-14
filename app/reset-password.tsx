@@ -31,7 +31,6 @@ export default function ResetPasswordScreen() {
           }
         }
       } catch (error) {
-        console.error('Error al verificar sesión:', error);
       } finally {
         setLoading(false);
       }

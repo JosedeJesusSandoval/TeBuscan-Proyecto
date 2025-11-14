@@ -50,7 +50,6 @@ export default function MapaScreen() {
       setLocation(location);
       setLoading(false);
     } catch (error) {
-      console.error('Error obteniendo ubicación:', error);
       setLocation({
         coords: {
           latitude: 25.6866,
@@ -69,47 +68,25 @@ export default function MapaScreen() {
 
   const fetchReportes = async (estatus?: string) => {
     try {
-      console.log(`🗺️ Cargando reportes para mapa con estatus: ${estatus || 'todos'}`);
-      
       const filtros: any = { dias_recientes: 365 };
       
       if (estatus && estatus !== 'todos') {
         filtros.estatus = estatus;
-        console.log(`🔍 Aplicando filtro de estatus: ${estatus}`);
       }
 
       const resultado = await obtenerReportesParaMapa(filtros);
 
       if (resultado.success) {
-        console.log(`📊 Reportes obtenidos para mapa: ${resultado.data?.length || 0}`);
-        
-        // Debug: mostrar distribución de estatus
-        if (resultado.data && resultado.data.length > 0) {
-          const distribucion = resultado.data.reduce((acc: any, reporte: any) => {
-            acc[reporte.estatus] = (acc[reporte.estatus] || 0) + 1;
-            return acc;
-          }, {});
-          console.log('📈 Distribución de estatus en mapa:', distribucion);
-          
-          // Mostrar algunos ejemplos
-          resultado.data.slice(0, 3).forEach((reporte: any, index: number) => {
-            console.log(`${index + 1}. ${reporte.nombre_desaparecido} - ${reporte.estatus} - Coords: ${reporte.latitud}, ${reporte.longitud}`);
-          });
-        }
-        
         setReportes(resultado.data || []);
       } else {
-        console.error('Error obteniendo reportes para mapa:', resultado.error);
         setReportes([]);
       }
     } catch (error) {
-      console.error('Error obteniendo reportes para mapa:', error);
       setReportes([]);
     }
   };
 
   const cambiarFiltro = (nuevoEstatus: string) => {
-    console.log(`🔄 Cambiando filtro de mapa de '${filtroEstatus}' a '${nuevoEstatus}'`);
     setFiltroEstatus(nuevoEstatus);
     fetchReportes(nuevoEstatus);
     setMostrarFiltros(false);

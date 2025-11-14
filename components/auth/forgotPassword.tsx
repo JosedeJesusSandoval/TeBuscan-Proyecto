@@ -42,7 +42,6 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onBackToLogin })
     setLoading(true);
 
     try {
-      console.log('🚀 Iniciando proceso de recuperación...');
       const result = await enviarRecuperacionContrasena(email.trim().toLowerCase());
 
       if (result.success) {
@@ -53,11 +52,9 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onBackToLogin })
           [{ text: 'OK' }]
         );
       } else {
-        console.log('❌ Error en recuperación:', result.error);
         Alert.alert('Error', result.error || 'Error al enviar el correo de recuperación');
       }
     } catch (error) {
-      console.error('💥 Error inesperado al enviar correo de recuperación:', error);
       Alert.alert('Error', 'Error de conexión. Por favor intenta de nuevo.');
     } finally {
       setLoading(false);
@@ -65,7 +62,6 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onBackToLogin })
   };
 
   const handleDiagnostico = async () => {
-    console.log('🔧 Iniciando diagnóstico...');
     const diagnostico = await diagnosticarConfiguracion();
     
     Alert.alert(
@@ -83,7 +79,6 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onBackToLogin })
 
     try {
       setLoading(true);
-      console.log('🧪 Creando usuario de prueba...');
       
       const result = await crearUsuarioAuth(email.trim().toLowerCase(), 'TempPassword123!');
       
@@ -97,7 +92,6 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onBackToLogin })
         Alert.alert('Error al crear usuario', result.error);
       }
     } catch (error) {
-      console.error('Error en test de usuario:', error);
       Alert.alert('Error', 'Error al crear usuario de prueba');
     } finally {
       setLoading(false);

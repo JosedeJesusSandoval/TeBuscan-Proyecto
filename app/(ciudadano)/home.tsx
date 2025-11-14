@@ -29,7 +29,7 @@ export default function HomeScreen() {
           );
         }
       } catch (error) {
-        console.error('Error obteniendo ubicación en tiempo real:', error);
+        // Error handling silenciado
       }
     };
 
@@ -53,7 +53,6 @@ export default function HomeScreen() {
         setCiudad('Ciudad desconocida');
       }
     } catch (error) {
-      console.error('Error obteniendo la ciudad:', error);
       setCiudad('Error al obtener ciudad');
     }
   };
@@ -107,11 +106,9 @@ export default function HomeScreen() {
 
         setTodosLosReportes(reportesTransformados);
       } else {
-        console.error('Error al cargar reportes:', resultado.error);
         setTodosLosReportes([]);
       }
     } catch (error) {
-      console.error('Error cargando reportes cercanos:', error);
       setTodosLosReportes([]);
     }
   };
@@ -125,7 +122,7 @@ export default function HomeScreen() {
         await updateCity(location.coords.latitude, location.coords.longitude);
       }
     } catch (error) {
-      console.error('Error obteniendo ubicación:', error);
+      // Error handling silenciado
     }
   };
 

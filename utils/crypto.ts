@@ -1,6 +1,5 @@
 import * as Crypto from 'expo-crypto';
 
-// Clave secreta para cifrado (en producción debería estar en variables de entorno)
 const SECRET_KEY = 'TeBuscan_2024_Secret_Key_CNB_Protection';
 
 export const hashPassword = async (password: string): Promise<string> => {
@@ -20,53 +19,47 @@ export const verifyPassword = async (password: string, hashedPassword: string): 
   return hash === hashedPassword;
 };
 
-// Simple XOR cipher para cifrar datos sensibles (para React Native)
 const simpleEncrypt = (text: string, key: string): string => {
   let result = '';
   for (let i = 0; i < text.length; i++) {
     result += String.fromCharCode(text.charCodeAt(i) ^ key.charCodeAt(i % key.length));
   }
-  return btoa(result); // Base64 encode
+  return btoa(result);
 };
 
 const simpleDecrypt = (encryptedText: string, key: string): string => {
   try {
-    const text = atob(encryptedText); // Base64 decode
+    const text = atob(encryptedText);
     let result = '';
     for (let i = 0; i < text.length; i++) {
       result += String.fromCharCode(text.charCodeAt(i) ^ key.charCodeAt(i % key.length));
     }
     return result;
   } catch (error) {
-    return encryptedText; // Return original if decryption fails
+    return encryptedText;
   }
 };
 
-// Cifrar datos sensibles
 export const encryptSensitiveData = (data: string): string => {
   try {
     if (!data || data.trim() === '') return '';
     const encrypted = simpleEncrypt(data, SECRET_KEY);
     return encrypted;
   } catch (error) {
-    console.error('Error cifrando datos:', error);
-    return data; // En caso de error, devolver datos sin cifrar para no perder información
+    return data;
   }
 };
 
-// Descifrar datos sensibles
 export const decryptSensitiveData = (encryptedData: string): string => {
   try {
     if (!encryptedData || encryptedData.trim() === '') return '';
     const decrypted = simpleDecrypt(encryptedData, SECRET_KEY);
     return decrypted;
   } catch (error) {
-    console.error('Error descifrando datos:', error);
-    return encryptedData; // En caso de error, devolver datos como están
+    return encryptedData;
   }
 };
 
-// Información de contacto institucional para mostrar al público
 export const getInstitutionalContactInfo = () => {
   return {
     nombre_reportante: 'Comisión Nacional de Búsqueda (CNB)',

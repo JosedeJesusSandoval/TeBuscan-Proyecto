@@ -1,16 +1,13 @@
-// Sistema simple de verificación por códigos de 6 dígitos
 import { supabase } from './supabase';
 
-// Generar código de verificación de 6 dígitos
 export const generarCodigoVerificacion = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
-// Guardar código temporal en base de datos
 export const guardarCodigoVerificacion = async (email, codigo) => {
   try {
     const expiraEn = new Date();
-    expiraEn.setMinutes(expiraEn.getMinutes() + 15); // Código válido por 15 minutos
+    expiraEn.setMinutes(expiraEn.getMinutes() + 15);
 
     const { error } = await supabase
       .from('codigos_verificacion')
@@ -33,7 +30,6 @@ export const guardarCodigoVerificacion = async (email, codigo) => {
   }
 };
 
-// Verificar código ingresado por el usuario
 export const verificarCodigo = async (email, codigoIngresado) => {
   try {
     const { data, error } = await supabase
@@ -49,13 +45,11 @@ export const verificarCodigo = async (email, codigoIngresado) => {
       return { success: false, error: 'Código inválido o expirado' };
     }
 
-    // Marcar código como usado
     await supabase
       .from('codigos_verificacion')
       .update({ usado: true })
       .eq('id', data.id);
 
-    // Marcar usuario como verificado
     await supabase
       .from('usuarios')
       .update({ 
@@ -71,7 +65,6 @@ export const verificarCodigo = async (email, codigoIngresado) => {
   }
 };
 
-// Reenviar código
 export const reenviarCodigo = async (email) => {
   const codigo = generarCodigoVerificacion();
   
@@ -80,13 +73,9 @@ export const reenviarCodigo = async (email) => {
     return guardado;
   }
 
-  // Aquí irían las instrucciones para enviar el email
-  // Por ahora, mostrar el código en consola para testing
-  console.log(`📧 CÓDIGO DE VERIFICACIÓN PARA ${email}: ${codigo}`);
-  
   return { 
     success: true, 
-    codigo: codigo, // Solo para desarrollo
+    codigo: codigo,
     message: 'Código de verificación enviado' 
   };
 };

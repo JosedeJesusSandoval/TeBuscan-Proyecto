@@ -10,18 +10,13 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // ============ FUNCIONES DE USUARIOS ============
 
-// Versión simplificada para desarrollo (sin email verification)
 export const insertarUsuarioSimple = async (name, email, password_hash, rol = 'ciudadano', telefono = '', institucion = '', jurisdiccion = '') => {
   try {
-    console.log('📝 Registrando usuario simple:', { name, email, rol });
-
-    // Verificar si ya existe
     const usuarioExiste = await existeUsuario(email);
     if (usuarioExiste) {
       return { success: false, error: 'Ya existe una cuenta con este correo electrónico' };
     }
 
-    // Insertar directamente en tabla personalizada
     const userData = {
       name,
       email,
@@ -31,7 +26,7 @@ export const insertarUsuarioSimple = async (name, email, password_hash, rol = 'c
       institucion: institucion || null,
       jurisdiccion: rol === 'ciudadano' ? null : (jurisdiccion || null),
       activo: true,
-      verificado: true, // Para desarrollo, marcar como verificado directamente
+      verificado: true,
     };
 
     const { data, error } = await supabase
@@ -40,18 +35,15 @@ export const insertarUsuarioSimple = async (name, email, password_hash, rol = 'c
       .select();
 
     if (error) {
-      console.error('❌ Error al insertar usuario:', error);
       return { success: false, error: error.message };
     }
 
-    console.log('✅ Usuario registrado exitosamente (modo simple)');
     return { 
       success: true, 
       data: data[0],
       message: 'Usuario registrado exitosamente. Puedes iniciar sesión ahora.'
     };
   } catch (error) {
-    console.error('📊 Error en insertarUsuarioSimple:', error);
     return { success: false, error: error.message };
   }
 };
@@ -79,11 +71,9 @@ export const existeUsuario = async (email) => {
 
 // ============ FIN DE FUNCIONES DE USUARIOS ============
 
-// Verificar login con rol
 export const verificarLogin = async (email, password) => {
   return await safeAsyncCall(
     async () => {
-      // Buscar usuario sin filtrar por activo primero para dar mensajes específicos
       const { data, error } = await supabase
         .from('usuarios')
         .select('id, name, email, rol, activo, verificado, password_hash')
@@ -94,18 +84,15 @@ export const verificarLogin = async (email, password) => {
         return { success: false, error: 'Usuario o contraseña incorrectos' };
       }
 
-      // Verificar contraseña primero
       const hashedPassword = await hashPassword(password);
       if (hashedPassword !== data.password_hash) {
         return { success: false, error: 'Usuario o contraseña incorrectos' };
       }
 
-      // Verificar si el usuario está activo
       if (!data.activo) {
         return { success: false, error: 'Tu cuenta ha sido desactivada. Contacta al administrador.' };
       }
 
-      // Verificar si el usuario está verificado
       if (!data.verificado) {
         if (data.rol === 'autoridad') {
           return { 
@@ -122,8 +109,6 @@ export const verificarLogin = async (email, password) => {
           };
         }
       }
-
-      console.log(`✅ Login exitoso para ${email} (${data.rol})`);
       
       return { 
         success: true, 
@@ -147,31 +132,9 @@ export const verificarLogin = async (email, password) => {
 
 
 
-// Función de diagnóstico para verificar configuración
 export const diagnosticarConfiguracion = async () => {
   try {
-    console.log('🔧 Diagnosticando configuración de Supabase...');
-    
-    // Verificar URLs y keys
-    console.log('📍 Supabase URL:', supabaseUrl ? '✅ Configurada' : '❌ No configurada');
-    console.log('🔑 Supabase Key:', supabaseAnonKey ? '✅ Configurada' : '❌ No configurada');
-    console.log('📍 URL completa:', supabaseUrl);
-    
-    // Verificar conexión
     const { data, error } = await supabase.auth.getSession();
-    console.log('🔌 Conexión a Supabase:', error ? '❌ Error' : '✅ OK');
-    
-    if (error) {
-      console.error('Error de conexión:', error);
-    }
-    
-    // Verificar configuración de Auth
-    try {
-      const { data: settings } = await supabase.auth.getUser();
-      console.log('👤 Estado de Auth:', settings ? '✅ Disponible' : '❌ No disponible');
-    } catch (authError) {
-      console.log('👤 Auth no inicializado (normal)');
-    }
     
     return {
       url: !!supabaseUrl,
@@ -180,7 +143,6 @@ export const diagnosticarConfiguracion = async () => {
       urlValue: supabaseUrl
     };
   } catch (error) {
-    console.error('Error en diagnóstico:', error);
     return {
       url: false,
       key: false,
@@ -190,25 +152,19 @@ export const diagnosticarConfiguracion = async () => {
   }
 };
 
-// Crear usuario en Supabase Auth (para testing)
 export const crearUsuarioAuth = async (email, password) => {
   try {
-    console.log('👤 Creando usuario en Supabase Auth:', email);
-    
     const { data, error } = await supabase.auth.signUp({
       email: email,
       password: password,
     });
 
     if (error) {
-      console.error('Error al crear usuario Auth:', error);
       return { success: false, error: error.message };
     }
 
-    console.log('✅ Usuario Auth creado:', data);
     return { success: true, data };
   } catch (error) {
-    console.error('Error en crearUsuarioAuth:', error);
     return { success: false, error: error.message };
   }
 };
@@ -216,9 +172,8 @@ export const crearUsuarioAuth = async (email, password) => {
 // Sincronizar usuarios existentes con Supabase Auth
 export const sincronizarUsuariosAuth = async () => {
   try {
-    console.log('🔄 Sincronizando usuarios con Supabase Auth...');
+    console.log('Sincronizando usuarios con Supabase Auth...');
     
-    // Obtener todos los usuarios de la tabla personalizada
     const { data: usuarios, error } = await supabase
       .from('usuarios')
       .select('email');
@@ -243,11 +198,10 @@ export const sincronizarUsuariosAuth = async () => {
           console.error(`Error sincronizando ${usuario.email}:`, authError);
           errores++;
         } else {
-          console.log(`✅ Usuario sincronizado: ${usuario.email}`);
           sincronizados++;
         }
 
-        // Pequeña pausa para no saturar la API
+        await new Promise(resolve => setTimeout(resolve, 100));
         await new Promise(resolve => setTimeout(resolve, 100));
       } catch (error) {
         console.error(`Error procesando ${usuario.email}:`, error);
@@ -255,7 +209,7 @@ export const sincronizarUsuariosAuth = async () => {
       }
     }
 
-    console.log(`📊 Sincronización completada: ${sincronizados} exitosos, ${errores} errores`);
+    console.log(`Sincronización completada: ${sincronizados} exitosos, ${errores} errores`);
     return { 
       success: true, 
       data: { 
@@ -273,21 +227,19 @@ export const sincronizarUsuariosAuth = async () => {
 // Verificar historial de emails enviados (solo para debug)
 export const verificarEmailsEnviados = async (email) => {
   try {
-    console.log('📧 Verificando historial de emails para:', email);
+    console.log('Verificando historial de emails para:', email);
     
-    // Intentar obtener información del usuario en Supabase Auth
     const { data: users, error } = await supabase.auth.admin.listUsers();
     
     if (error) {
-      console.log('⚠️ No se puede acceder al admin (normal en desarrollo)');
+      console.log('No se puede acceder al admin (normal en desarrollo)');
       return { success: false, message: 'No se puede verificar historial (requiere permisos admin)' };
     }
     
     const user = users.find(u => u.email === email);
-    console.log('👤 Usuario encontrado en Supabase Auth:', !!user);
     
     if (user) {
-      console.log('📊 Datos del usuario:', {
+      console.log('Datos del usuario:', {
         id: user.id,
         email: user.email,
         confirmed: user.email_confirmed_at !== null,
@@ -353,7 +305,6 @@ export const actualizarUsuario = async (usuarioId, userData) => {
   }
 };
 
-// Obtener usuarios
 export const obtenerUsuarios = async () => {
   try {
     const { data, error } = await supabase
@@ -361,13 +312,11 @@ export const obtenerUsuarios = async () => {
       .select('*');
 
     if (error) {
-      console.error('Error al obtener usuarios:', error);
       return { data: null, error };
     }
 
     return { data, error: null };
   } catch (error) {
-    console.error('Error en obtenerUsuarios:', error);
     return { data: null, error };
   }
 };
@@ -375,9 +324,8 @@ export const obtenerUsuarios = async () => {
 // Desactivar usuario completamente (base de datos + auth)
 export const desactivarUsuario = async (usuarioId, email) => {
   try {
-    console.log(`🔒 Desactivando usuario: ${email} (ID: ${usuarioId})`);
+    console.log(`Desactivando usuario: ${email} (ID: ${usuarioId})`);
 
-    // 1. Actualizar el campo verificado en la base de datos
     const { data: updateData, error: updateError } = await supabase
       .from('usuarios')
       .update({ verificado: false })
@@ -389,10 +337,8 @@ export const desactivarUsuario = async (usuarioId, email) => {
       return { success: false, error: updateError.message };
     }
 
-    console.log('✅ Usuario marcado como no verificado en BD');
+    console.log('Usuario marcado como no verificado en BD');
 
-    // 2. Intentar desactivar en Supabase Auth (Admin API)
-    // Nota: Esto requiere privilegios de admin, si no está disponible, continúa
     try {
       const { data: authData, error: authError } = await supabase.auth.admin.updateUserById(
         usuarioId,
@@ -400,13 +346,12 @@ export const desactivarUsuario = async (usuarioId, email) => {
       );
 
       if (authError) {
-        console.warn('⚠️ No se pudo desactivar en Auth (requiere privilegios admin):', authError.message);
-        // No es error crítico, el usuario sigue desactivado en BD
+        console.warn('No se pudo desactivar en Auth (requiere privilegios admin):', authError.message);
       } else {
-        console.log('✅ Usuario desactivado en Supabase Auth');
+        console.log('Usuario desactivado en Supabase Auth');
       }
     } catch (authError) {
-      console.warn('⚠️ Auth admin no disponible:', authError.message);
+      console.warn('Auth admin no disponible:', authError.message);
     }
 
     return { 
@@ -416,17 +361,15 @@ export const desactivarUsuario = async (usuarioId, email) => {
     };
 
   } catch (error) {
-    console.error('❌ Error desactivando usuario:', error);
+    console.error('Error desactivando usuario:', error);
     return { success: false, error: error.message };
   }
 };
 
-// Activar usuario completamente (base de datos + auth)
 export const activarUsuario = async (usuarioId, email) => {
   try {
-    console.log(`🔓 Activando usuario: ${email} (ID: ${usuarioId})`);
+    console.log(`Activando usuario: ${email} (ID: ${usuarioId})`);
 
-    // 1. Actualizar el campo verificado en la base de datos
     const { data: updateData, error: updateError } = await supabase
       .from('usuarios')
       .update({ verificado: true })
@@ -438,9 +381,8 @@ export const activarUsuario = async (usuarioId, email) => {
       return { success: false, error: updateError.message };
     }
 
-    console.log('✅ Usuario marcado como verificado en BD');
+    console.log('Usuario marcado como verificado en BD');
 
-    // 2. Intentar activar en Supabase Auth (Admin API)
     try {
       const { data: authData, error: authError } = await supabase.auth.admin.updateUserById(
         usuarioId,
@@ -448,13 +390,12 @@ export const activarUsuario = async (usuarioId, email) => {
       );
 
       if (authError) {
-        console.warn('⚠️ No se pudo activar en Auth (requiere privilegios admin):', authError.message);
-        // No es error crítico, el usuario sigue activado en BD
+        console.warn('No se pudo activar en Auth (requiere privilegios admin):', authError.message);
       } else {
-        console.log('✅ Usuario activado en Supabase Auth');
+        console.log('Usuario activado en Supabase Auth');
       }
     } catch (authError) {
-      console.warn('⚠️ Auth admin no disponible:', authError.message);
+      console.warn('Auth admin no disponible:', authError.message);
     }
 
     return { 
@@ -464,7 +405,7 @@ export const activarUsuario = async (usuarioId, email) => {
     };
 
   } catch (error) {
-    console.error('❌ Error activando usuario:', error);
+    console.error('Error activando usuario:', error);
     return { success: false, error: error.message };
   }
 };
@@ -683,7 +624,7 @@ export const obtenerReportesPorUsuarioConContacto = async (usuarioId) => {
     // Descifrar la información de contacto para los reportes propios
     const reportesConContacto = data.map(reporte => {
       try {
-        console.log(`\n🔍 Procesando reporte ${reporte.id}:`);
+        console.log(`\nProcesando reporte ${reporte.id}:`);
         console.log('- nombre_reportante_cifrado:', reporte.nombre_reportante_cifrado ? 'PRESENTE' : 'NULL');
         console.log('- nombre_reportante:', reporte.nombre_reportante ? reporte.nombre_reportante.substring(0, 30) + '...' : 'NULL');
         
@@ -691,43 +632,39 @@ export const obtenerReportesPorUsuarioConContacto = async (usuarioId) => {
 
         // Función simple para descifrar automáticamente
         const procesarCampo = (campoCifrado, campoNormal, nombreCampo) => {
-          console.log(`\n🔄 Procesando ${nombreCampo}:`);
+          console.log(`\nProcesando ${nombreCampo}:`);
           
-          // Intentar descifrar el campo normal primero (que parece contener los datos cifrados)
           if (campoNormal && campoNormal.trim() !== '') {
             try {
               const descifrado = decryptSensitiveData(campoNormal);
-              console.log(`  📤 Campo normal: "${campoNormal}"`);
-              console.log(`  📥 Descifrado: "${descifrado}"`);
+              console.log(`  Campo normal: "${campoNormal}"`);
+              console.log(`  Descifrado: "${descifrado}"`);
               
-              // Si el descifrado es diferente y no está vacío, usarlo
               if (descifrado && descifrado !== campoNormal && descifrado.trim() !== '') {
-                console.log(`  ✅ Usando campo normal descifrado para ${nombreCampo}`);
+                console.log(`  Usando campo normal descifrado para ${nombreCampo}`);
                 return descifrado;
               }
             } catch (error) {
-              console.log(`  ❌ Error descifrando campo normal: ${error.message}`);
+              console.log(`  Error descifrando campo normal: ${error.message}`);
             }
           }
 
-          // Si hay campo cifrado, intentar con ese
           if (campoCifrado && campoCifrado.trim() !== '') {
             try {
               const descifrado = decryptSensitiveData(campoCifrado);
-              console.log(`  📤 Campo cifrado: "${campoCifrado}"`);
-              console.log(`  📥 Descifrado: "${descifrado}"`);
+              console.log(`  Campo cifrado: "${campoCifrado}"`);
+              console.log(`  Descifrado: "${descifrado}"`);
               
               if (descifrado && descifrado !== campoCifrado && descifrado.trim() !== '') {
-                console.log(`  ✅ Usando campo cifrado descifrado para ${nombreCampo}`);
+                console.log(`  Usando campo cifrado descifrado para ${nombreCampo}`);
                 return descifrado;
               }
             } catch (error) {
-              console.log(`  ❌ Error descifrando campo cifrado: ${error.message}`);
+              console.log(`  Error descifrando campo cifrado: ${error.message}`);
             }
           }
 
-          // Como último recurso, usar el campo normal sin descifrar
-          console.log(`  ⚠️ Usando campo normal sin descifrar para ${nombreCampo}`);
+          console.log(`  Usando campo normal sin descifrar para ${nombreCampo}`);
           return campoNormal || campoCifrado || '';
         };
 

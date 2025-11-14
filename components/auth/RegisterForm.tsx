@@ -117,7 +117,6 @@ const RegisterForm = () => {
         Alert.alert('Error de registro', resultado.error || 'Error desconocido');
       }
     } catch (error) {
-      console.error('Error en registro:', error);
       Alert.alert('Error', getErrorMessage(error));
     } finally {
       setLoading(false);

@@ -22,7 +22,7 @@ export default function RootLayout() {
     const healthCheckInterval = setInterval(() => {
       const health = checkAppHealth();
       if (health.memoryWarning) {
-        console.warn('⚠️ Memoria alta detectada - optimizando...');
+
         optimizePerformance();
       }
     }, 5 * 60 * 1000); // 5 minutos

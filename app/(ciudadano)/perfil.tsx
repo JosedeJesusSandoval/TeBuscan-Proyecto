@@ -1,17 +1,17 @@
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Modal,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Modal,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { actualizarUsuario, cambiarContrasena, obtenerReportesPorUsuarioConContacto, supabase } from '../../DB/supabase';
 import { useAuth } from '../../context/AuthContext';
@@ -45,11 +45,9 @@ export default function PerfilScreen() {
 
       if (resultado.success) {
         setReportes(resultado.data || []);
-      } else {
-        console.error('Error al cargar reportes:', resultado.error);
       }
     } catch (error) {
-      console.error('Error al cargar reportes:', error);
+      // Error handling silenciado
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -68,15 +66,12 @@ export default function PerfilScreen() {
           .single();
 
         if (data) {
-          console.log('Datos del usuario:', data);
           setUser(data);
           // Actualizar también el estado local userData
           setUserData({
             name: data.name || '',
             email: data.email || ''
           });
-        } else {
-          console.error('Error al cargar usuario:', error);
         }
       }
     };

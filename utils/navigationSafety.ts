@@ -2,7 +2,6 @@ import { router } from 'expo-router';
 import { Alert } from 'react-native';
 import { safeAsyncCall } from './crashHandler';
 
-// Wrapper seguro para navegación que previene crashes
 export const safeNavigate = async (path: any, params?: any) => {
   return await safeAsyncCall(
     async () => {
@@ -15,23 +14,21 @@ export const safeNavigate = async (path: any, params?: any) => {
     },
     'Error al navegar a la pantalla solicitada',
     (error) => {
-      console.error('📱 Error de navegación:', {
+      console.error('Error de navegación:', {
         path,
         params,
         error: error.message,
       });
       
-      // Intentar navegar a una pantalla segura
       try {
         router.replace('/(auth)' as any);
       } catch (fallbackError) {
-        console.error('❌ Error crítico de navegación:', fallbackError);
+        console.error('Error crítico de navegación:', fallbackError);
       }
     }
   );
 };
 
-// Función para reemplazar de forma segura
 export const safeReplace = async (path: any, params?: any) => {
   return await safeAsyncCall(
     async () => {
@@ -44,7 +41,7 @@ export const safeReplace = async (path: any, params?: any) => {
     },
     'Error al cambiar de pantalla',
     (error) => {
-      console.error('📱 Error de reemplazo de ruta:', {
+      console.error('Error de reemplazo de ruta:', {
         path,
         params,
         error: error.message,
@@ -53,7 +50,6 @@ export const safeReplace = async (path: any, params?: any) => {
   );
 };
 
-// Función para ir atrás de forma segura
 export const safeGoBack = async () => {
   return await safeAsyncCall(
     async () => {
@@ -66,22 +62,19 @@ export const safeGoBack = async () => {
     },
     'Error al regresar a la pantalla anterior',
     (error) => {
-      console.error('📱 Error al ir atrás:', error.message);
-      // Como fallback, ir a la pantalla de auth
+      console.error('Error al ir atrás:', error.message);
       try {
         router.replace('/(auth)' as any);
       } catch (fallbackError) {
-        console.error('❌ Error crítico de navegación hacia atrás:', fallbackError);
+        console.error('Error crítico de navegación hacia atrás:', fallbackError);
       }
     }
   );
 };
 
-// Función para manejar rutas profundas de forma segura
 export const safeDeepLink = async (url: string) => {
   return await safeAsyncCall(
     async () => {
-      // Validar que la URL sea segura
       const allowedPaths = [
         '/(auth)',
         '/(ciudadano)',
@@ -101,7 +94,7 @@ export const safeDeepLink = async (url: string) => {
     },
     'Error al procesar el enlace',
     (error) => {
-      console.error('🔗 Error de enlace profundo:', {
+      console.error('Error de enlace profundo:', {
         url,
         error: error.message,
       });
@@ -120,7 +113,6 @@ export const safeDeepLink = async (url: string) => {
   );
 };
 
-// Hook personalizado para navegación segura
 export const useNavigationSafety = () => {
   const navigate = safeNavigate;
   const replace = safeReplace;

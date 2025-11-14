@@ -22,8 +22,6 @@ const LoginForm = () => {
     setLoading(true);
 
     try {
-      console.log('Intentando login para:', email);
-
       const resultado = await verificarLogin(email.trim(), password); // Enviar contraseña sin hashear
 
       if (resultado.success && resultado.usuario) {
@@ -63,7 +61,6 @@ const LoginForm = () => {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Error inesperado';
       Alert.alert('Error', errorMessage);
-      console.error('Error en login:', error);
     } finally {
       setLoading(false);
     }

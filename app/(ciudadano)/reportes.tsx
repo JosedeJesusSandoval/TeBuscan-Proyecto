@@ -14,9 +14,6 @@ export default function ReportesScreen() {
 
   // Función para aplicar filtros de estado
   const aplicarFiltroEstado = (reportesBase: any[]) => {
-    console.log(`🔍 Aplicando filtro de estado: ${filtroEstado}`);
-    console.log(`📊 Reportes base para filtrar: ${reportesBase.length}`);
-    
     let reportesFiltrados = [];
     
     switch (filtroEstado) {
@@ -33,21 +30,11 @@ export default function ReportesScreen() {
         reportesFiltrados = reportesBase;
     }
     
-    console.log(`✅ Reportes después del filtro '${filtroEstado}': ${reportesFiltrados.length}`);
-    
-    // Debug: mostrar distribución de estatus
-    const distribucion = reportesBase.reduce((acc, reporte) => {
-      acc[reporte.estatus] = (acc[reporte.estatus] || 0) + 1;
-      return acc;
-    }, {} as any);
-    console.log('📈 Distribución de estatus:', distribucion);
-    
     setReportes(reportesFiltrados);
   };
 
   // Función para cambiar filtro de estado
   const cambiarFiltroEstado = (nuevoFiltro: 'todos' | 'desaparecidos' | 'encontrados') => {
-    console.log(`🔄 Cambiando filtro de '${filtroEstado}' a '${nuevoFiltro}'`);
     setFiltroEstado(nuevoFiltro);
     aplicarFiltroEstado(reportesTodos);
   }; 
@@ -55,27 +42,15 @@ export default function ReportesScreen() {
   const cargarReportes = async () => {
     try {
       setLoading(true);
-      console.log('🔄 Cargando reportes...');
       
       const resultado = await obtenerReportesRecientes(50);
 
       if (resultado.success && resultado.data) {
-        console.log(`📊 Total de reportes obtenidos: ${resultado.data.length}`);
-        
-        // Debug: Mostrar algunos reportes disponibles
-        console.log('📋 Primeros reportes disponibles:');
-        resultado.data.slice(0, 5).forEach((reporte: any, index: number) => {
-          console.log(`${index + 1}. ${reporte.nombre_desaparecido} - ${reporte.ultima_ubicacion} - ${reporte.estatus}`);
-        });
-        
         // Usar la misma lógica de filtrado exitosa de home.tsx
         let reportesFiltrados = [];
         if (!ciudadUsuario) {
-          console.log('⚠️ Sin ubicación detectada, mostrando todos los reportes');
           reportesFiltrados = resultado.data || [];
         } else {
-          console.log(`🔍 Filtrando reportes para: ${ciudadUsuario}`);
-          
           // Filtrar reportes por ciudad con lógica mejorada y flexible (igual que home.tsx)
           reportesFiltrados = resultado.data.filter((reporte: any) => {
             if (!reporte.ultima_ubicacion) return false;
@@ -105,15 +80,9 @@ export default function ReportesScreen() {
                      ubicacionReporte.includes('tlajomulco')
                    ));
             
-            if (coincide) {
-              console.log(`✅ Reporte coincidente: ${reporte.nombre_desaparecido} en ${reporte.ultima_ubicacion}`);
-            }
-            
             return coincide;
           });
         }
-
-        console.log(`🎯 Reportes filtrados: ${reportesFiltrados.length}`);
 
         // Guardar todos los reportes filtrados por ubicación
         setReportesTodos(reportesFiltrados || []);
@@ -121,12 +90,10 @@ export default function ReportesScreen() {
         // Aplicar filtro de estado
         aplicarFiltroEstado(reportesFiltrados || []);
       } else {
-        console.error('Error al cargar reportes:', resultado.error || 'Datos no disponibles');
         setReportes([]);
         setReportesTodos([]);
       }
     } catch (error) {
-      console.error('Error al cargar reportes:', error);
       setReportes([]);
       setReportesTodos([]);
     } finally {
@@ -141,7 +108,6 @@ export default function ReportesScreen() {
       // Solicitar permisos de ubicación
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        console.log('Permisos de ubicación denegados');
         setCiudadUsuario(''); // Sin filtro si no hay permisos
         return;
       }
@@ -162,20 +128,16 @@ export default function ReportesScreen() {
         
         // Usar exactamente la misma lógica que home.tsx
         if (address && address.city) {
-          console.log('🏙️ Ciudad detectada:', address.city);
           setCiudadUsuario(address.city);
           // Cargar reportes inmediatamente después de obtener la ciudad (como home.tsx)
           // cargarReportes se ejecutará automáticamente por el useEffect
         } else {
-          console.log('No se pudo obtener información de la ciudad');
           setCiudadUsuario('Ciudad desconocida');
         }
       } else {
-        console.log('No se pudo obtener información de la ciudad');
         setCiudadUsuario('');
       }
     } catch (error) {
-      console.error('Error obteniendo ubicación del usuario:', error);
       setCiudadUsuario(''); // Sin filtro si hay error
     }
   };
@@ -191,7 +153,6 @@ export default function ReportesScreen() {
   // Cargar reportes cuando cambie la ciudad (igual que home.tsx)
   useEffect(() => {
     if (ciudadUsuario) {
-      console.log('🔄 Cargando reportes para ciudad:', ciudadUsuario);
       cargarReportes();
     }
   }, [ciudadUsuario]);
